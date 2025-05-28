@@ -19,14 +19,13 @@ def create_dataset_from_str(text: str, tokenizer) -> Dataset:
     text = tokenizer.apply_chat_template(
         [{'role': 'user', 'content': text}],
         tokenize=False, add_generation_prompt=True)
-    data = {'text' : [text]}
+    data = {'prompt' : [text], 'answer' : ['']}
     return Dataset.from_dict(data)
 
 
 # # ---------- Reward Functions ----------
 def flesch_kincaid_reward_func(completions, **kwargs):
-    responses = [c[0]['content'] for c in completions]
-    scores = [textstat.flesch_kincaid_grade(r) for r in responses]
+    scores = [textstat.flesch_kincaid_grade(r) for r in completions]
     return [1 if s < 3 else 0 for s in scores]
 
 
