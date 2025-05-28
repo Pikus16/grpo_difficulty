@@ -24,9 +24,11 @@ def create_dataset_from_str(text: str, tokenizer) -> Dataset:
 
 
 # # ---------- Reward Functions ----------
-def flesch_kincaid_reward_func(completions, **kwargs):
-    scores = [textstat.flesch_kincaid_grade(r) for r in completions]
-    return [1 if s < 3 else 0 for s in scores]
+def create_flesch_kincaid_reward_func(threshold: float):
+    def flesch_kincaid_reward_func(completions, **kwargs):
+        scores = [textstat.flesch_kincaid_grade(r) for r in completions]
+        return [1 if s < threshold else 0 for s in scores]
+    return flesch_kincaid_reward_func
 
 
 # ---------- Main Functions ----------
@@ -51,6 +53,8 @@ def load_model_and_tokenizer(max_seq_length: int = 2048, lora_rank: int = 32, lo
 
 def train(model, tokenizer, dataset,
           save_path: str,
+          run_name: str,
+          flesch_threshold: float,
           max_seq_length: int = 2048,
           max_completion_length: int = 250):
     config = GRPOConfig(
@@ -70,12 +74,13 @@ def train(model, tokenizer, dataset,
         max_grad_norm=0.1,
         report_to="wandb",
         output_dir="runs",
+        run_name=run_name
     )
     trainer = GRPOTrainer(
         model=model,
         processing_class=tokenizer,
         reward_funcs=[
-            flesch_kincaid_reward_func,
+            create_flesch_kincaid_reward_func(flesch_threshold),
         ],
         args=config,
         train_dataset=dataset,
@@ -92,14 +97,16 @@ def setup_wandb(project='GRPO_DIFFICULTY', name='gsm8k'):
 @click.option('--project', type=str, default='GRPO_DIFFICULTY')
 @click.option('--name', type=str, default='gsm8k')
 @click.option('--save_path', type=str, default='runs')
-def main(project, name, save_path):
+@click.option('--flesch_threshold', '-f', type=float, default=4, help='Flesch-Kincaid grade level threshold for reward function')
+def main(project, name, save_path, flesch_threshold):
     #os.environ['WANDB_API_KEY'] = '54a50cbe22da3f857fcb7812dd80fedc2ef01ad4'
+    click.echo(f'Using threshold {flesch_threshold}')
     setup_wandb(project=project, name=name)
     
     model, tokenizer = load_model_and_tokenizer()
     dataset = create_dataset_from_str(text=PROMPT, tokenizer=tokenizer)
 
-    train(model, tokenizer, dataset, save_path=save_path)
+    train(model, tokenizer, dataset, save_path=save_path, run_name=name, flesch_threshold=flesch_threshold)
 
 if __name__ == '__main__':
     main()
