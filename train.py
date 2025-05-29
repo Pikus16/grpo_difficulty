@@ -8,6 +8,7 @@ from trl import GRPOConfig, GRPOTrainer
 import click
 import re
 from datasets import Dataset
+import wandb
 
 # ---------- Constants ----------
 PROMPT = "Describe photosynthesis. Use as simple terms as possible"
@@ -27,6 +28,10 @@ def create_dataset_from_str(text: str, tokenizer) -> Dataset:
 def create_flesch_kincaid_reward_func(threshold: float):
     def flesch_kincaid_reward_func(completions, **kwargs):
         scores = [textstat.flesch_kincaid_grade(r) for r in completions]
+        # Log average flesch score to W&B
+        avg_flesch_score = sum(scores) / len(scores) if scores else 0
+        wandb.log({"avg_flesch_kincaid_score": avg_flesch_score})
+        
         return [1 if s < threshold else 0 for s in scores]
     return flesch_kincaid_reward_func
 
