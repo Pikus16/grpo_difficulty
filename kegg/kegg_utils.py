@@ -4,28 +4,9 @@ from datasets import load_dataset
 import re
 
 def load_train_model_and_tokenizer(model_name="unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit",
-                             adapter_path=None,
                              max_seq_length: int = 4000,
                              lora_rank: int = 16,
                              load_in_4bit = False):
-    model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=model_name,
-        max_seq_length=max_seq_length,
-        load_in_4bit=load_in_4bit,
-        fast_inference=True,
-        max_lora_rank=lora_rank,
-        gpu_memory_utilization=0.9,
-    )
-    if adapter_path is not None:
-        model.load_adapter(adapter_path)
-    return model, tokenizer
-    
-def load_test_model_and_tokenizer(model_name="unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit",
-                             adapter_path=None,
-                             max_seq_length: int = 4000,
-                             lora_rank: int = 16,
-                             load_in_4bit = False,
-                             for_inference: bool = False):
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=model_name,
         max_seq_length=max_seq_length,
@@ -42,6 +23,24 @@ def load_test_model_and_tokenizer(model_name="unsloth/Meta-Llama-3.1-8B-Instruct
         use_gradient_checkpointing="unsloth",
         random_state=3407,
     )
+    return model, tokenizer
+    
+def load_test_model_and_tokenizer(model_name="unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit",
+                             adapter_path=None,
+                             max_seq_length: int = 4000,
+                             lora_rank: int = 16,
+                             load_in_4bit = False):
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name=model_name,
+        max_seq_length=max_seq_length,
+        load_in_4bit=load_in_4bit,
+        fast_inference=True,
+        max_lora_rank=lora_rank,
+        gpu_memory_utilization=0.9,
+    )
+    if adapter_path is not None:
+        model.load_adapter(adapter_path)
+    _ = FastLanguageModel.for_inference(model) # Enable native 2x faster inference
     return model, tokenizer
 
 def format_kegg_prompt(example, include_sequence=False):
