@@ -1,4 +1,4 @@
-from kegg_utils import load_model_and_tokenizer, load_kegg_dataset, parse_llm_responses
+from kegg_utils import load_train_model_and_tokenizer, load_kegg_dataset, parse_llm_responses
 import os
 import click
 from trl import GRPOConfig, GRPOTrainer
@@ -67,7 +67,7 @@ def setup_wandb(project='GRPO_DIFFICULTY', name='gsm8k'):
 def main(project, name, save_path, num_generations):
     setup_wandb(project=project, name=name)
     
-    model, tokenizer = load_model_and_tokenizer()
+    model, tokenizer = load_train_model_and_tokenizer()
     dataset = load_kegg_dataset(split='train')
 
     train(model,
