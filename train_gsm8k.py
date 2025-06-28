@@ -19,7 +19,6 @@ PROMPT = """Solve the following math word problem.
 {q}
 
 Think step-by-step. Then, provide the final answer as a single integer in the format "Answer: XXX" with no extra formatting."""
-MODEL_NAME = "unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit"
 
 
 # ---------- Utility Functions ----------
@@ -58,9 +57,9 @@ def correctness_reward_func(completions, answer, **kwargs):
     return scores.astype(int)
 
 # ---------- Main Functions ----------
-def load_model_and_tokenizer(max_seq_length: int = 2048, lora_rank: int = 32, load_in_4bit = False):
+def load_model_and_tokenizer(model_name, max_seq_length: int = 2048, lora_rank: int = 32, load_in_4bit = False):
     model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=MODEL_NAME,
+        model_name=model_name,
         max_seq_length=max_seq_length,
         load_in_4bit=load_in_4bit,
         fast_inference=True,
@@ -125,12 +124,13 @@ def setup_wandb(project='GRPO_DIFFICULTY', name='gsm8k'):
 @click.option('--save_path', type=str, default='runs')
 @click.option('--difficulty_level', '-d', type=int, default=25, help='difficulty for gsm8k')
 @click.option('--num_generations', '-n', type=int, default=4, help='Number of generations per iteration')
-def main(project, name, save_path, difficulty_level, num_generations):
+@click.option('--model_name', '-m', type=str, default="unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit")
+def main(project, name, save_path, difficulty_level, num_generations, model_name):
     click.echo(f'Using difficulty {difficulty_level}')
     setup_wandb(project=project, name=name)
 
     dataset = make_dataset(difficulty_level=difficulty_level)
-    model, tokenizer = load_model_and_tokenizer()
+    model, tokenizer = load_model_and_tokenizer(model_name=model_name)
 
     train(model,
           tokenizer, 
