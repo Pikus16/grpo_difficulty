@@ -41,27 +41,27 @@ def load_model(model_name, adapter=None):
     _ = FastLanguageModel.for_inference(model_) # Enable native 2x faster inference
     return model_, tokenizer_
 
-def get_answer(tokenizer, model, prompt, num_times_to_repeat: int = 8):
-    generation_kwargs = {
-        "max_new_tokens": 250,
-        "use_cache": True,
-        "temperature": 0.9,
-        "top_k": None,
-        "do_sample": True,
-    }
+# def get_answer(tokenizer, model, prompt, num_times_to_repeat: int = 8):
+#     generation_kwargs = {
+#         "max_new_tokens": 250,
+#         "use_cache": True,
+#         "temperature": 0.9,
+#         "top_k": None,
+#         "do_sample": True,
+#     }
 
-    formatted_prompts = [tokenizer.apply_chat_template(
-        [{'role': 'user', 'content': prompt}],
-        tokenize=False, add_generation_prompt=True)] * num_times_to_repeat
+#     formatted_prompts = [tokenizer.apply_chat_template(
+#         [{'role': 'user', 'content': prompt}],
+#         tokenize=False, add_generation_prompt=True)] * num_times_to_repeat
     
-    inputs = tokenizer(formatted_prompts, return_tensors = "pt", padding=True).to("cuda")
-    with torch.no_grad():
-        outputs = model.generate(**inputs, **generation_kwargs)
-    outputs = outputs[:, inputs.input_ids.shape[1]:]
-    outputs = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-    return outputs
+#     inputs = tokenizer(formatted_prompts, return_tensors = "pt", padding=True).to("cuda")
+#     with torch.no_grad():
+#         outputs = model.generate(**inputs, **generation_kwargs)
+#     outputs = outputs[:, inputs.input_ids.shape[1]:]
+#     outputs = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+#     return outputs
 
-def get_answer_batch(tokenizer, model, prompts, num_times_to_repeat: int = 8):
+def get_answer_batch(tokenizer, model, prompts, num_times_to_repeat: int = 8, apply_template: bool = False):
     """
     Process multiple prompts in a single batch for better GPU utilization
     """
@@ -74,12 +74,15 @@ def get_answer_batch(tokenizer, model, prompts, num_times_to_repeat: int = 8):
     }
 
     # Create all formatted prompts at once
-    all_formatted_prompts = []
-    for prompt in prompts:
-        formatted_prompt = tokenizer.apply_chat_template(
-            [{'role': 'user', 'content': prompt}],
-            tokenize=False, add_generation_prompt=True)
-        all_formatted_prompts.extend([formatted_prompt] * num_times_to_repeat)
+    if apply_template:
+        all_formatted_prompts = []
+        for prompt in prompts:
+            formatted_prompt = tokenizer.apply_chat_template(
+                [{'role': 'user', 'content': prompt}],
+                tokenize=False, add_generation_prompt=True)
+            all_formatted_prompts.extend([formatted_prompt] * num_times_to_repeat)
+    else:
+        all_formatted_prompts = prompts * num_times_to_repeat
     
     # Tokenize in larger batches
     inputs = tokenizer(all_formatted_prompts, return_tensors="pt", padding=True, truncation=True).to("cuda")
