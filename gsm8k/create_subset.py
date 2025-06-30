@@ -52,6 +52,8 @@ def main(
     # Get accuracies
     with open(output_file) as f:
         js = json.load(f)
+
+    print(f'{len(js)} number of questions processing')
     accs_inds = defaultdict(list)
     for i,responses in enumerate(js):
         preds = [extract_boxed_content(r) for r in responses]

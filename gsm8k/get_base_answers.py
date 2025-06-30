@@ -26,7 +26,6 @@ def build_model_and_tokenizer(model_name, device: str = 'cuda'):
     return model, tokenizer
 
 def format_question(questions: list[str], tokenizer):
-
     prompts = [
         tokenizer.apply_chat_template(
             [{'role': 'user', 'content': f"{q}.\nPut your final answer within \\boxed{{}}."}],
