@@ -1,12 +1,10 @@
-
-import re
-from datasets import load_dataset
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from tqdm import tqdm
 import json
 import click
 import os
+from gsm8k_utils import load_gsm8k_dataset
 
 def build_model_and_tokenizer(model_name, device: str = 'cuda'):
     # 1) Load tokenizer & model
@@ -37,15 +35,6 @@ def format_question(questions: list[str], tokenizer):
         for q in questions
     ]
     return tokenizer(prompts, return_tensors="pt", padding=True, truncation=True).to("cuda")
-
-
-def load_gsm8k_dataset(dataset_name='openai/gsm8k', subset='train'):
-    def parse_dataset_answer(example):
-        match = re.search(r"\n####\s*(.+)", example['answer']).group(1).strip().replace(',','')
-        return {'parsed' : int(match)}
-    ds = load_dataset(dataset_name, "main", split=subset)
-    ds = ds.map(parse_dataset_answer)
-    return ds
 
 def sample_pass_at_k(
     model,
