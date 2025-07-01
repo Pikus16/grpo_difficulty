@@ -98,7 +98,7 @@ def write_to_file(destination, all_responses):
     show_default=True,
     help="Output folder to write all responses"
 )
-@click.option('--batch-size', '-b', default=16, 
+@click.option('--batch-size', '-b', default=32, 
               show_default=True, help="Number of questions to batch together")
 @click.option('--adapter-name', '-a', default=None, 
               show_default=True, help="Adapter name")
@@ -127,6 +127,7 @@ def main(
     if subset_folder is None or difficulty_level is None:
         print(f'Loading dataset {dataset_name}, subset {subset}')
         ds = load_gsm8k_dataset(dataset_name, subset=subset)
+        answers = [x['parsed'] for x in ds]
     else:
         print(f'Loading difficulty subset {difficulty_level}, dataset {dataset_name}, subset {subset_folder}')
         ds = load_difficulty_subset(
@@ -136,6 +137,8 @@ def main(
             model_name=model_name,
             subset='train'
         )
+        answers = [x['answer'] for x in ds]
+        
     model, tokenizer = build_model_and_tokenizer(model_name=model_name, adapter_name=adapter_name)
 
     if output_folder is not None:
@@ -169,18 +172,16 @@ def main(
         batch = ds[i: i + batch_size]
         questions = batch['question']
         responses = sample_pass_at_k(model, tokenizer, questions, k=num_repeat)
+        all_responses.extend(responses)
         if output_folder is not None:
-            all_responses.extend(responses)
-
             if i % (10 * batch_size) == 0:
-                torch.cuda.empty_cache()
+                #torch.cuda.empty_cache()
                 write_to_file(output_file, all_responses)
 
     if output_folder is not None:
         write_to_file(output_file, all_responses)
 
     # get accuracies and pass@k
-    answers = [x['parsed'] for x in ds]
     assert len(answers) == len(all_responses)
     accs, pass_at_k = [], []
     for answer, responses in zip(answers, all_responses):
