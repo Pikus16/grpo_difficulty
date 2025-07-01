@@ -116,9 +116,18 @@ def main(
         os.mkdir(output_folder)
 
     output_file = os.path.join(output_folder, f"{model_name.replace('/','-')}.json")
+    print(f"Output file: {output_file}")
+    if os.path.exists(output_file):
+        with open(output_file, 'r') as f:
+            all_responses = json.load(f)
+        print(f"Loaded {len(all_responses)} responses from {output_file}")
+    else:
+        all_responses = []
 
-    all_responses = []
     for i in tqdm(range(0, len(ds), batch_size)):
+        if i < len(all_responses):
+            continue
+        
         batch = ds[i: i + batch_size]
         questions = batch['question']
         responses = sample_pass_at_k(model, tokenizer, questions, k=num_repeat)

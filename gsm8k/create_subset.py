@@ -32,7 +32,7 @@ import click
 )
 @click.option(
     '--subset_folder',
-    default='subset_train',
+    default='accuracy_subset',
     show_default=True,
     help="Folder where dataset accuracy subsets should be written to"
 )
