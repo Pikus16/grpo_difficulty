@@ -4,9 +4,10 @@ from tqdm import tqdm
 import json
 import click
 import os
-from gsm8k_utils import load_gsm8k_dataset, format_question_qwen
+import numpy as np
+from gsm8k_utils import load_gsm8k_dataset, format_question_qwen, extract_boxed_content
 
-def build_model_and_tokenizer(model_name, device: str = 'cuda'):
+def build_model_and_tokenizer(model_name, adapter_name=None, device: str = 'cuda'):
     # 1) Load tokenizer & model
     tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
     model = (
@@ -14,6 +15,8 @@ def build_model_and_tokenizer(model_name, device: str = 'cuda'):
         .from_pretrained(model_name, trust_remote_code=True)
         .to(device)
     )
+    if adapter_name is not None:
+        model.load_adapter(adapter_name)
     model.eval()
 
     # 2) (Optional) Compile for speed if you're on PyTorch 2.x
@@ -95,8 +98,10 @@ def write_to_file(destination, all_responses):
     show_default=True,
     help="Output folder to write all responses"
 )
-@click.option('--batch-size', '-b', default=4, 
+@click.option('--batch-size', '-b', default=16, 
               show_default=True, help="Number of questions to batch together")
+@click.option('--adapter-name', '-a', default=None, 
+              show_default=True, help="Adapter name")
 def main(
     dataset_name: str,
     subset: str,
@@ -104,9 +109,10 @@ def main(
     num_repeat: int,
     output_folder: str,
     batch_size: int,
+    adapter_name: str,
 ):
     ds = load_gsm8k_dataset(dataset_name, subset=subset)
-    model, tokenizer = build_model_and_tokenizer(model_name=model_name)
+    model, tokenizer = build_model_and_tokenizer(model_name=model_name, adapter_name=adapter_name)
 
     if not os.path.exists(output_folder):
         os.mkdir(output_folder)
@@ -115,7 +121,11 @@ def main(
     if not os.path.exists(output_folder):
         os.mkdir(output_folder)
 
-    output_file = os.path.join(output_folder, f"{model_name.replace('/','-')}.json")
+    if adapter_name is None:
+        output_file = os.path.join(output_folder, f"{model_name.replace('/','-')}.json")
+    else:
+        output_file = os.path.join(output_folder, f"{os.path.basename(adapter_name)}.json")
+
     print(f"Output file: {output_file}")
     if os.path.exists(output_file):
         with open(output_file, 'r') as f:
@@ -138,6 +148,17 @@ def main(
             write_to_file(output_file, all_responses)
 
     write_to_file(output_file, all_responses)
+
+    # get accuracies and pass@k
+    answers = [x['parsed'] for x in ds]
+    assert len(answers) == len(all_responses)
+    accs, pass_at_k = [], []
+    for answer, responses in zip(answers, all_responses):
+        preds = np.array([extract_boxed_content(r) for r in responses])
+        accs.append(np.mean(answer == preds))
+        pass_at_k.append(1 if answer in preds else 0)
+    print(f"Accuracy: {np.mean(accs)}")
+    print(f"Pass@{num_repeat}: {np.mean(pass_at_k)}")
 
 
 if __name__ == '__main__':
