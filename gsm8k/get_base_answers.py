@@ -4,7 +4,7 @@ from tqdm import tqdm
 import json
 import click
 import os
-from gsm8k_utils import load_gsm8k_dataset
+from gsm8k_utils import load_gsm8k_dataset, format_question_qwen
 
 def build_model_and_tokenizer(model_name, device: str = 'cuda'):
     # 1) Load tokenizer & model
@@ -25,15 +25,6 @@ def build_model_and_tokenizer(model_name, device: str = 'cuda'):
 
     return model, tokenizer
 
-def format_question(questions: list[str], tokenizer):
-    prompts = [
-        tokenizer.apply_chat_template(
-            [{'role': 'user', 'content': f"{q}.\nPut your final answer within \\boxed{{}}."}],
-            tokenize=False, add_generation_prompt=True, enable_thinking=False
-        )
-        for q in questions
-    ]
-    return tokenizer(prompts, return_tensors="pt", padding=True, truncation=True).to("cuda")
 
 def sample_pass_at_k(
     model,
@@ -45,7 +36,7 @@ def sample_pass_at_k(
     top_p: float = 1,
 ) -> list[str]:
     
-    inputs = format_question(questions, tokenizer)
+    inputs = format_question_qwen(questions, tokenizer)
     batch_size = len(questions)
 
     # Generate k samples in parallel
