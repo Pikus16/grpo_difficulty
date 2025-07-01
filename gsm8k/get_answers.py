@@ -106,7 +106,7 @@ def write_to_file(destination, all_responses):
     '--subset_folder',
     default='accuracy_subset',
     show_default=True,
-    help="Folder where dataset accuracy subsets should be written to"
+    help="Folder where dataset accuracy subsets should be read from"
 )
 @click.option(
     '--difficulty_level',
