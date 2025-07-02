@@ -82,7 +82,7 @@ def write_to_file(destination, all_responses):
 )
 @click.option(
     '--output_folder', '-o',
-    default='dyck_outputs',
+    default=None,
     show_default=True,
     help="Output folder to write all responses"
 )
@@ -90,14 +90,21 @@ def write_to_file(destination, all_responses):
               show_default=True, help="Number of questions to batch together")
 @click.option('--adapter-name', '-a', default=None, 
               show_default=True, help="Adapter name")
+@click.option(
+    '--subset', '-s',
+    default='test',
+    show_default=True,
+    help="Dataset split to use"
+)
 def main(
     model_name: str,
     num_repeat: int,
     output_folder: str,
     batch_size: int,
-    adapter_name: str
+    adapter_name: str,
+    subset: str
 ):
-    ds = load_dyck_dataset()
+    ds = load_dyck_dataset(subset=subset)
     answers = [x['answer'] for x in ds]
         
     model, tokenizer = build_model_and_tokenizer(model_name=model_name, adapter_name=adapter_name)
@@ -105,6 +112,11 @@ def main(
     if output_folder is not None:
         if not os.path.exists(output_folder):
             os.mkdir(output_folder)
+
+        if subset is not None:
+            output_folder = os.path.join(output_folder, subset)
+            if not os.path.exists(output_folder):
+                os.mkdir(output_folder)
 
         if adapter_name is None:
             output_file = os.path.join(output_folder, f"{model_name.replace('/','-')}.json")
