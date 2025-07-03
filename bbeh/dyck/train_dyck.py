@@ -106,17 +106,22 @@ def format_dataset(ds, tokenizer):
               type=int,
               default=1000,
               help='Number of generations per iteration')
+@click.option('--load_4bit', '-l',
+              type=bool,
+              default=True,
+              help='Number of generations per iteration')
 def main(project: str,
          save_dir: str, 
          num_generations: int,
          model_name: str,
-         max_steps: int):
+         max_steps: int,
+         load_4bit: bool):
     name = f'bbeh-dyck_{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
     setup_wandb(project=project, name=name)
 
     dataset = load_dyck_dataset(subset='train')
     click.echo(f'Loaded train dataset of size {len(dataset)}')
-    model, tokenizer = load_model_and_tokenizer(model_name=model_name)
+    model, tokenizer = load_model_and_tokenizer(model_name=model_name, load_in_4bit=load_4bit)
     dataset = format_dataset(dataset, tokenizer)
 
     if not os.path.exists(save_dir):
