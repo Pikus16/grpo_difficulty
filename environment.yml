@@ -1,0 +1,19 @@
+name: grpo
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.10 
+  - pip
+  - pip:
+      - torch
+      - torchvision
+      - vllm==0.8.2
+      - textstat
+      - unsloth
+      - wandb
+      - huggingface_hub
+      - trl
+      - datasets
+      - transformers
+      - flash-attn --no-build-isolation
