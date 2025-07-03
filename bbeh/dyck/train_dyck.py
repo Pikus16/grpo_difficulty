@@ -77,7 +77,8 @@ def train(model, tokenizer, dataset,
         train_dataset=dataset,
     )
     trainer.train()
-    #model.save_lora(save_path)
+    
+    model.save_pretrained(save_path)
     #model.save_pretrained_merged(f"{save_path}/merged", tokenizer, save_method="lora")
 
 def setup_wandb(project='GRPO_DIFFICULTY', name='gsm8k'):

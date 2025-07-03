@@ -2,7 +2,11 @@ import re
 from datasets import load_dataset
 import os
 
-def load_dyck_dataset(subset: str=None, dset_path='dset'):
+def load_dyck_dataset(subset: str=None, dset_path=None):
+    if dset_path is None:
+        # get file directory
+        dirname = os.path.dirname(os.path.abspath(__file__))
+        dset_path = os.path.join(dirname, 'dset')
     if subset is None:
         ds = load_dataset('maveriq/bigbenchhard', 'dyck_languages', split='train')
         ds = ds.rename_column('input', 'question').rename_column('target', 'answer')
