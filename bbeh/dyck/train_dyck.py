@@ -107,9 +107,8 @@ def format_dataset(ds, tokenizer):
               default=1000,
               help='Number of generations per iteration')
 @click.option('--load_4bit', '-l',
-              type=bool,
-              default=True,
-              help='Number of generations per iteration')
+              is_flag=True,
+              help='Load model in 4-bit mode (flag)')
 def main(project: str,
          save_dir: str, 
          num_generations: int,
