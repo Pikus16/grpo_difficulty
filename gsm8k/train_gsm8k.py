@@ -212,7 +212,7 @@ def main(project: str,
         model_name=model_name,
         num_repeat=1, # hard coded to 1 for now
         output_folder=None, # not saving outputs for now
-        batch_size=4,
+        batch_size=32,
         adapter_folder=checkpoint_dir,
         subset_folder=subset_folder,
         difficulty_level=difficulty_level
