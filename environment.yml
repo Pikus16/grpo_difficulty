@@ -16,4 +16,3 @@ dependencies:
       - trl
       - datasets
       - transformers
-      - flash-attn --no-build-isolation

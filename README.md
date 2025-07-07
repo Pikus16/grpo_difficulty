@@ -21,4 +21,5 @@ Make sure you have Conda installed. If you dont, run:
 ```bash
 conda env create -f environment.yml
 conda activate grpo
+pip install flash-attn==2.7.4.post1 --no-build-isolation
 ```
