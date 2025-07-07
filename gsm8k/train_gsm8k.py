@@ -134,7 +134,7 @@ def main(project: str,
         difficulty_level=difficulty_level,
         subset_folder=subset_folder,
         dataset_name=dataset_name,
-        model_name=model_name,
+        #model_name=model_name,
         subset='train'
     )
     model, tokenizer = load_model_and_tokenizer(model_name=model_name)

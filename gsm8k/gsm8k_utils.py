@@ -36,7 +36,7 @@ def format_question_qwen(questions: list[str], tokenizer, device='cuda'):
     prompts = [format_single_question_qwen(q, tokenizer) for q in questions]
     return tokenizer(prompts, return_tensors="pt", padding=True, truncation=True).to(device)
 
-def load_difficulty_subset(difficulty_level, subset_folder, dataset_name, model_name, subset='train'):
+def load_difficulty_subset(difficulty_level, subset_folder, dataset_name, model_name='unsloth/Qwen3-4B-unsloth-bnb-4bit', subset='train'):
     subset_file = os.path.join(
         subset_folder, 
         f"{dataset_name.replace('/','-')}_{subset}_{model_name.replace('/','-')}",
