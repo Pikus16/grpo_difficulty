@@ -1,5 +1,7 @@
 import click
 from gsm8k_utils import run_on_all_checkpoints
+import os
+import json
 
 @click.command()
 @click.option(
@@ -70,7 +72,9 @@ def main(
         difficulty_level
     )
 
-    # TODO: save to file
+    if output_folder is not None:
+       with open(os.path.join(output_folder, f'{subset}_results.json'), 'w') as f:
+          json.dump(results, f)
     
 
 

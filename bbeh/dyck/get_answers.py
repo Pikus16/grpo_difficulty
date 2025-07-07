@@ -1,5 +1,7 @@
 import click
 from dyck_utils import run_on_all_checkpoints
+import os
+import json
 
 @click.command()
 @click.option(
@@ -47,7 +49,9 @@ def main(
         subset
     )
 
-     # TODO: save to file
+    if output_folder is not None:
+       with open(os.path.join(output_folder, f'{subset}_results.json'), 'w') as f:
+          json.dump(results, f)
 
 
 if __name__ == '__main__':
