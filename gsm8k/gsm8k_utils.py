@@ -69,11 +69,11 @@ def build_model_and_tokenizer(model_name, adapter_name=None, device: str = 'cuda
     model.eval()
 
     # 2) (Optional) Compile for speed if you're on PyTorch 2.x
-    if torch.backends.cuda.is_built():
-        try:
-            model = torch.compile(model)
-        except Exception:
-            pass
+    # if torch.backends.cuda.is_built():
+    #     try:
+    #         model = torch.compile(model)
+    #     except Exception:
+    #         pass
 
     return model, tokenizer
 
@@ -155,6 +155,8 @@ def do_single_run(model_name,
         
         batch = ds[i: i + batch_size]
         questions = batch['question']
+        print(type(model))
+        breakpoint()
         responses = sample_pass_at_k(model, tokenizer, questions, k=num_repeat)
         all_responses.extend(responses)
         if output_folder is not None:

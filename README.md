@@ -40,3 +40,16 @@ To run just test, run:
 `python get_answers.py -k 1 --difficulty_level 0`
 
 Both have arguments that can be overwritten.
+
+#### BBEH Dyck Languages
+
+Both train and eval should be run in `bbeh/dyck` directory.
+To run both train and test, run:
+
+`python train_dyck.py`
+
+To run just test, run:
+
+`python get_answers.py -k 1`
+
+Both have arguments that can be overwritten.

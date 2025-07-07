@@ -99,7 +99,7 @@ def format_dataset(ds, tokenizer):
     ds = ds.map(_format_prompt)
     return ds
 
-def log_inference_results(results, difficulty_level):
+def log_inference_results(results):
     """Log inference results to the active wandb run"""
     if wandb.run is None:
         print("Warning: No active wandb run found for logging inference results")
@@ -117,20 +117,20 @@ def log_inference_results(results, difficulty_level):
     
     # Log base model performance
     wandb.log({
-        f'test/base_accuracy_difficulty_{difficulty_level}': base_accuracy,
-        f'test/base_{pass_at_k_key}_difficulty_{difficulty_level}': base_pass_at_k
+        f'test/base_accuracy': base_accuracy,
+        f'test/base_{pass_at_k_key}': base_pass_at_k
     })
     
     # Log per-checkpoint metrics
     for i, (checkpoint_num, accuracy) in enumerate(zip(checkpoint_numbers, accuracies)):
         log_data = {
-            f'test/accuracy_difficulty_{difficulty_level}': accuracy,
+            f'test/accuracy': accuracy,
             f'test/checkpoint_step': checkpoint_num
         }
         
         # Add pass@k if available
         if pass_at_k_values and i < len(pass_at_k_values):
-            log_data[f'test/{pass_at_k_key}_difficulty_{difficulty_level}'] = pass_at_k_values[i]
+            log_data[f'test/{pass_at_k_key}'] = pass_at_k_values[i]
         
         wandb.log(log_data, step=checkpoint_num)
     
@@ -219,7 +219,7 @@ def main(project: str,
     )
 
     # Log inference results to the same wandb run
-    log_inference_results(results, difficulty_level)
+    log_inference_results(results)
     
     # save inference info
     with open(os.path.join(save_dir, 'test_results.json'), 'w') as f:

@@ -58,7 +58,7 @@ def main(
     subset_folder: str,
     difficulty_level:int
 ):
-    accuracies, passes, checkpoint_numbers = run_on_all_checkpoints(
+    results = run_on_all_checkpoints(
         dataset_name,
         subset,
         model_name,
@@ -69,6 +69,8 @@ def main(
         subset_folder,
         difficulty_level
     )
+
+    # TODO: save to file
     
 
 

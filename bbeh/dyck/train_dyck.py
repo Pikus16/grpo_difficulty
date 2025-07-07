@@ -12,7 +12,7 @@ import wandb
 import numpy as np
 import json
 from datasets import load_dataset
-from dyck_utils import load_dyck_dataset, format_single_question_qwen, extract_boxed_content
+from dyck_utils import load_dyck_dataset, format_single_question_qwen, extract_boxed_content, run_on_all_checkpoints
 
     
 def correctness_reward_func(completions, answer, **kwargs):
@@ -46,7 +46,8 @@ def train(model, tokenizer, dataset,
           max_completion_length: int = 250,
           num_generations: int = 4,
           batch_size: int = 4,
-          max_steps: int = 1000):
+          max_steps: int = 1000,
+          checkpoint_dir: str = 'runs'):
     config = GRPOConfig(
         learning_rate=5e-6,
         adam_beta1=0.9,
@@ -63,7 +64,7 @@ def train(model, tokenizer, dataset,
         max_steps=max_steps,
         max_grad_norm=0.1,
         report_to="wandb",
-        output_dir="runs",
+        output_dir=checkpoint_dir,
         run_name=run_name,
         save_steps=100
     )
@@ -85,12 +86,55 @@ def setup_wandb(project='GRPO_DIFFICULTY', name='gsm8k'):
     os.environ['WANDB_PROJECT'] = project
     os.environ['WANDB_NAME'] = name
 
+    # calling init now to save both train and test
+    wandb.init(
+        project=project,
+        name=name
+    )
+
 def format_dataset(ds, tokenizer):
     def _format_prompt(example):
         new_prompt = format_single_question_qwen(example['question'], tokenizer)
         return {'prompt' : new_prompt}
     ds = ds.map(_format_prompt)
     return ds
+
+def log_inference_results(results):
+    """Log inference results to the active wandb run"""
+    if wandb.run is None:
+        print("Warning: No active wandb run found for logging inference results")
+        return
+    
+    # Extract data from results dictionary
+    checkpoint_numbers = results.get('checkpoint', [])
+    accuracies = results.get('accuracy', [])
+    pass_at_k_key = [k for k in results.keys() if k.startswith('pass@')][0] if any(k.startswith('pass@') for k in results.keys()) else None
+    pass_at_k_values = results.get(pass_at_k_key, []) if pass_at_k_key else []
+    
+    base_accuracy = results.get('base accuracy', 0)
+    base_pass_at_k_key = [k for k in results.keys() if k.startswith('base pass@')][0] if any(k.startswith('base pass@') for k in results.keys()) else None
+    base_pass_at_k = results.get(base_pass_at_k_key, 0) if base_pass_at_k_key else 0
+    
+    # Log base model performance
+    wandb.log({
+        f'test/base_accuracy': base_accuracy,
+        f'test/base_{pass_at_k_key}': base_pass_at_k
+    })
+    
+    # Log per-checkpoint metrics
+    for i, (checkpoint_num, accuracy) in enumerate(zip(checkpoint_numbers, accuracies)):
+        log_data = {
+            f'test/accuracy': accuracy,
+            f'test/checkpoint_step': checkpoint_num
+        }
+        
+        # Add pass@k if available
+        if pass_at_k_values and i < len(pass_at_k_values):
+            log_data[f'test/{pass_at_k_key}'] = pass_at_k_values[i]
+        
+        wandb.log(log_data, step=checkpoint_num)
+    
+    print(f"Logged inference results for {len(checkpoint_numbers)} checkpoints to wandb")
 
 @click.command()
 @click.option('--project', type=str, default='GRPO_DIFFICULTY')
@@ -126,13 +170,39 @@ def main(project: str,
     if not os.path.exists(save_dir):
         os.mkdir(save_dir)
 
+    save_dir = os.path.join(save_dir, name)
+    checkpoint_dir = os.path.join(save_dir, 'checkpoints')
     train(model,
           tokenizer, 
           dataset, 
-          save_path=os.path.join(save_dir, name),
+          save_path=save_dir,
           run_name=name,
           num_generations=int(num_generations),
-          max_steps=max_steps)
+          max_steps=max_steps,
+          checkpoint_dir=checkpoint_dir  
+        )
+    
+    # clear up memory before inference
+    model.to('cpu')
+    del model
+    del tokenizer
+    torch.cuda.empty_cache()
+
+    results = run_on_all_checkpoints(
+        model_name,
+        num_repeat=1, # hard coded to 1 for now
+        output_folder=None, # not saving outputs for now
+        batch_size=32,
+        adapter_folder=checkpoint_dir,
+        subset='test'
+    )
+
+    # Log inference results to the same wandb run
+    log_inference_results(results)
+    
+    # save inference info
+    with open(os.path.join(save_dir, 'test_results.json'), 'w') as f:
+        json.dump(results, f)
 
 if __name__ == '__main__':
     main()
