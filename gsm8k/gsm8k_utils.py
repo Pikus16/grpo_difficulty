@@ -155,8 +155,6 @@ def do_single_run(model_name,
         
         batch = ds[i: i + batch_size]
         questions = batch['question']
-        print(type(model))
-        breakpoint()
         responses = sample_pass_at_k(model, tokenizer, questions, k=num_repeat)
         all_responses.extend(responses)
         if output_folder is not None:
