@@ -197,7 +197,7 @@ def run_on_all_checkpoints(
             difficulty_level=difficulty_level,
             subset_folder=subset_folder,
             dataset_name=dataset_name,
-            model_name=model_name,
+            #model_name=model_name,
             subset=subset
         )
         answers = [x['answer'] for x in ds]
