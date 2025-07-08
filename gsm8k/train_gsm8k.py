@@ -13,6 +13,9 @@ import numpy as np
 import json
 from datasets import load_dataset
 from gsm8k_utils import load_difficulty_subset, format_single_question_qwen, extract_boxed_content, run_on_all_checkpoints
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from grpo_utils import CumulativeSuccessCallback
 
     
 def correctness_reward_func(completions, answer, **kwargs):
@@ -76,6 +79,7 @@ def train(model, tokenizer, dataset,
         ],
         args=config,
         train_dataset=dataset,
+        callbacks=[CumulativeSuccessCallback()],
     )
     trainer.train()
     model.save_pretrained(save_path)
