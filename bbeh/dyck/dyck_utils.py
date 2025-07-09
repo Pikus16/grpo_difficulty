@@ -220,7 +220,8 @@ def run_on_all_checkpoints(
         answers,
         output_folder
     )
-
+    print(f"Base: Accuracy: {pretrained_accuracy:0.3f}, Pass@{num_repeat}: {pretrained_passes:0.3f}")
+    
     results = {
         'checkpoint': checkpoint_numbers,
         'accuracy': accuracies,
