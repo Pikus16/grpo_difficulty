@@ -266,17 +266,20 @@ def normalize_tool_calls(tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any
     """
     if tool_calls is None:
         return None
-    normalized_calls = [normalize_tool_call(call) for call in tool_calls]
-    
-    # Sort by name first, then by serialized arguments for consistent ordering
-    def sort_key(call):
-        name = call.get("name", "")
-        args = call.get("arguments", {})
-        # Convert to JSON string for consistent comparison
-        args_str = json.dumps(args, sort_keys=True)
-        return (name, args_str)
-    
-    return sorted(normalized_calls, key=sort_key)
+    try:
+        normalized_calls = [normalize_tool_call(call) for call in tool_calls]
+        
+        # Sort by name first, then by serialized arguments for consistent ordering
+        def sort_key(call):
+            name = call.get("name", "")
+            args = call.get("arguments", {})
+            # Convert to JSON string for consistent comparison
+            args_str = json.dumps(args, sort_keys=True)
+            return (name, args_str)
+        
+        return sorted(normalized_calls, key=sort_key)
+    except:
+        return None
 
 def compare_tool_calls(ground_truth: List[Dict[str, Any]], 
                       prediction: List[Dict[str, Any]]) -> bool:
