@@ -8,7 +8,7 @@ import json
 import os
 import numpy as np
 from glob import glob
-from typing import Optional
+from typing import List, Dict, Any, Union, Optional
 
 TASK_INSTRUCTION = """
 You are an expert in composing functions. You are given a question and a set of possible functions. 
@@ -34,24 +34,24 @@ def load_function_dataset(subset, dset_path = 'dset'):
         data_files=json_filepath, 
         split="train"
     )
-
-    def parse_answer(example):
-        answer = sort_tool(json.loads(example['answer_str']))
-        return {'answer' : answer}
-    ds = ds.map(parse_answer)
-    ds = ds.remove_columns(['id', 'answer_str'])
+    ds = ds.rename_columns({'answer_str' : 'answer'})
+    # def parse_answer(example):
+    #     answer = example['answer_str']#json.loads(example['answer_str'])
+    #     return {'answer' : answer}
+    # ds = ds.map(parse_answer)
+    #ds = ds.remove_columns(['id', 'answer_str'])
     return ds
 
-def sort_tool(tool: list) -> list:
-    # Turn each dict into a JSON string with sorted keys
-    canon = [json.dumps(call, sort_keys=True) for call in tool]
-    # Sort the list of JSON‐strings so order in the original list doesn't matter
-    return sorted(canon)
+# def sort_tool(tool: list) -> list:
+#     # Turn each dict into a JSON string with sorted keys
+#     canon = [json.dumps(call, sort_keys=True) for call in tool]
+#     # Sort the list of JSON‐strings so order in the original list doesn't matter
+#     return sorted(canon)
 
 def parse_response(pred: str) -> Optional[list]:
     try:
         pred = pred.split("</think>")[-1].strip()
-        return sort_tool(json.loads(pred))
+        return json.loads(pred)
     except:
         # formatting issue
         return None
@@ -183,10 +183,12 @@ def do_single_run(
     assert len(answers) == len(all_responses)
     accs, pass_at_k = [], []
     for answer, responses in zip(answers, all_responses):
-        preds = [parse_response(r) for r in responses]
-        perf = np.array([p == answer for p in preds])
+        predictions = [parse_response(r) for r in responses]
+        perf = np.array([compare_tool_calls(p,answer) for p in predictions])
         accs.append(np.mean(perf))
         pass_at_k.append(1 if any(perf) else 0)
+
+        
     return np.mean(accs), np.mean(pass_at_k)
 
 def run_on_all_checkpoints(
@@ -242,3 +244,47 @@ def run_on_all_checkpoints(
          f'base pass@{num_repeat}': pretrained_passes,
     }
     return results
+
+def normalize_tool_call(tool_call: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Normalize a single tool call by sorting its arguments dictionary.
+    """
+    if tool_call is None:
+        return None
+    normalized = tool_call.copy()
+    if "arguments" in normalized and isinstance(normalized["arguments"], dict):
+        # Sort the arguments dictionary by keys for consistent ordering
+        normalized["arguments"] = dict(sorted(normalized["arguments"].items()))
+    return normalized
+
+def normalize_tool_calls(tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Normalize a list of tool calls by:
+    1. Normalizing each individual tool call
+    2. Sorting the list by a consistent key (name + serialized arguments)
+    """
+    normalized_calls = [normalize_tool_call(call) for call in tool_calls]
+    
+    # Sort by name first, then by serialized arguments for consistent ordering
+    def sort_key(call):
+        name = call.get("name", "")
+        args = call.get("arguments", {})
+        # Convert to JSON string for consistent comparison
+        args_str = json.dumps(args, sort_keys=True)
+        return (name, args_str)
+    
+    return sorted(normalized_calls, key=sort_key)
+
+def compare_tool_calls(ground_truth: List[Dict[str, Any]], 
+                      prediction: List[Dict[str, Any]]) -> bool:
+    """
+    Compare two lists of tool calls in an order-agnostic way.
+    
+    Returns True if they are equivalent, False otherwise.
+    """
+    # Normalize both lists
+    norm_ground_truth = normalize_tool_calls(ground_truth)
+    norm_prediction = normalize_tool_calls(prediction)
+    
+    # Compare the normalized lists
+    return norm_ground_truth == norm_prediction

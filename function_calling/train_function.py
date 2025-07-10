@@ -12,7 +12,7 @@ import wandb
 import numpy as np
 import json
 from datasets import load_dataset
-from function_utils import load_function_dataset, format_single_question_qwen, parse_response, run_on_all_checkpoints
+from function_utils import load_function_dataset, format_single_question_qwen, parse_response, run_on_all_checkpoints, compare_tool_calls
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from grpo_utils import CumulativeSuccessCallback
@@ -20,7 +20,9 @@ from grpo_utils import CumulativeSuccessCallback
     
 def correctness_reward_func(completions, answer, **kwargs):
     predictions = [parse_response(r) for r in completions]
-    scores = np.array([p == answer for p in predictions])
+    assert len(answer) == len(predictions)
+    answer = [json.loads(a) for a in answer]
+    scores = np.array([compare_tool_calls(p,a) for p,a in zip(predictions, answer)])
     return scores.astype(int)
 
 # ---------- Main Functions ----------
