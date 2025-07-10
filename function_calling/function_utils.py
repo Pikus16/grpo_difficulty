@@ -50,6 +50,7 @@ def sort_tool(tool: list) -> list:
 
 def parse_response(pred: str) -> Optional[list]:
     try:
+        pred = pred.split("</think>")[-1].strip()
         return sort_tool(json.loads(pred))
     except:
         # formatting issue
