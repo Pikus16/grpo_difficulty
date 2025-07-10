@@ -183,6 +183,7 @@ def do_single_run(
     assert len(answers) == len(all_responses)
     accs, pass_at_k = [], []
     for answer, responses in zip(answers, all_responses):
+        answer = json.loads(answer)
         predictions = [parse_response(r) for r in responses]
         perf = np.array([compare_tool_calls(p,answer) for p in predictions])
         accs.append(np.mean(perf))
@@ -263,6 +264,8 @@ def normalize_tool_calls(tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any
     1. Normalizing each individual tool call
     2. Sorting the list by a consistent key (name + serialized arguments)
     """
+    if tool_calls is None:
+        return None
     normalized_calls = [normalize_tool_call(call) for call in tool_calls]
     
     # Sort by name first, then by serialized arguments for consistent ordering
