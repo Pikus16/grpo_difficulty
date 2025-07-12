@@ -70,7 +70,7 @@ def format_single_question_qwen(question: str, tokenizer, tools):
         [{'role': 'user', 'content': prompt}],
         tokenize=False,
         add_generation_prompt=True,
-        enable_thinking=False
+        enable_thinking=True
     )
 
 def format_question_qwen(questions: list[str], tools, tokenizer, device='cuda'):
