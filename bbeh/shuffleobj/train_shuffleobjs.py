@@ -11,7 +11,7 @@ from datasets import Dataset
 import wandb
 import numpy as np
 import json
-from shuffleobj_utils_utils import load_shuffleobj_dataset, format_single_question_qwen, extract_boxed_content, run_on_all_checkpoints
+from shuffleobj_utils import load_shuffleobj_dataset, format_single_question_qwen, extract_boxed_content, run_on_all_checkpoints
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from grpo_utils import CumulativeSuccessCallback
