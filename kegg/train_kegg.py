@@ -67,7 +67,7 @@ def train(model, tokenizer, dataset,
         report_to="wandb",
         output_dir=checkpoint_dir,
         run_name=run_name,
-        save_steps=20
+        save_steps=100
     )
     trainer = GRPOTrainer(
         model=model,
