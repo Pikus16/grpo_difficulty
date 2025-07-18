@@ -178,8 +178,7 @@ def run_on_all_checkpoints(
                 adapter_name,
                 subset,
                 batch_size,
-                num_repeat,
-                answers
+                num_repeat
             )
             print(f"Checkpoint: {ckpt_num}: Accuracy: {acc:0.3f}, Pass@{num_repeat}: {pass_at_k:0.3f}")
             accuracies.append(acc)
