@@ -136,7 +136,7 @@ def do_single_run(
             continue
         
         batch = ds[i: i + batch_size]
-        questions = batch['question']
+        questions = batch['prompt']
         responses = sample_pass_at_k(model, tokenizer, questions, k=num_repeat)
         all_responses.extend(responses)
         if output_file is not None:
