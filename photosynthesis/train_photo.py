@@ -68,7 +68,7 @@ def train(model, tokenizer, dataset,
         report_to="wandb",
         output_dir=checkpoint_dir,
         run_name=run_name,
-        save_steps=100
+        save_steps=25
     )
     trainer = GRPOTrainer(
         model=model,
@@ -101,13 +101,13 @@ def setup_wandb(project='GRPO_DIFFICULTY', name='gsm8k'):
 )
 @click.option('--max_steps',
               type=int,
-              default=1000,
+              default=400,
               help='Number of generations per iteration')
 def main(project, save_dir, flesch_threshold, num_generations, model_name: str,
          max_steps: int):
     
     click.echo(f'Using threshold {flesch_threshold}')
-    name = f'photosynthesis{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
+    name = f'photosynthesis{num_generations}gen_{max_steps}steps_{model_name}_{flesch_threshold}'.replace('/','-')
     setup_wandb(project=project, name=name)
     
     model, tokenizer = load_model_and_tokenizer(model_name=model_name)
