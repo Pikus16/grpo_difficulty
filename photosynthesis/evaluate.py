@@ -30,7 +30,7 @@ def main(
     num_generations: int,
     max_steps: int
 ):
-    name = f'photosynthesis{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
+    name = f'photosynthesis{num_generations}gen_{max_steps}steps_{model_name}_{flesch_threshold}'.replace('/','-')
     checkpoint_dir = os.path.join('models',name,'checkpoints')
     results = run_on_all_checkpoints(
         model_name=model_name,
