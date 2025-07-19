@@ -12,9 +12,9 @@ import json
 )
 @click.option('--num_to_gen',
               type=int,
-              default=1000,
+              default=100,
               help='Number of generations')
-@click.option('--batch-size', '-b', default=8, 
+@click.option('--batch-size', '-b', default=16, 
               show_default=True, help="Number of questions to batch together")
 @click.option('--flesch_threshold', '-f', type=float, default=4, help='Flesch-Kincaid grade level threshold for reward function')
 @click.option('--num_generations', '-n', type=int, default=8, help='Number of generations per iteration')
