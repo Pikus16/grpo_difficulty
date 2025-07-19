@@ -2,27 +2,14 @@ import unsloth
 from unsloth import FastLanguageModel
 import torch
 import textstat
-from vllm import SamplingParams
 import os
 from trl import GRPOConfig, GRPOTrainer
 import click
-import re
-from datasets import Dataset
 import wandb
-
-# ---------- Constants ----------
-PROMPT = "Describe photosynthesis. Use as simple terms as possible"
-MODEL_NAME = "unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit"
-
-
-# ---------- Utility Functions ----------
-def create_dataset_from_str(text: str, tokenizer) -> Dataset:
-    text = tokenizer.apply_chat_template(
-        [{'role': 'user', 'content': text}],
-        tokenize=False, add_generation_prompt=True)
-    data = {'prompt' : [text], 'answer' : ['']}
-    return Dataset.from_dict(data)
-
+from photo_utils import create_dataset_from_str
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from grpo_utils import CumulativeSuccessCallback
 
 # # ---------- Reward Functions ----------
 def create_flesch_kincaid_reward_func(threshold: float):
@@ -30,20 +17,18 @@ def create_flesch_kincaid_reward_func(threshold: float):
         scores = [textstat.flesch_kincaid_grade(r) for r in completions]
         # Log average flesch score to W&B
         avg_flesch_score = sum(scores) / len(scores) if scores else 0
-        wandb.log({"avg_flesch_kincaid_score": avg_flesch_score})
-        
+        wandb.log({"train/avg_flesch_kincaid_score": avg_flesch_score})
         return [1 if s < threshold else 0 for s in scores]
     return flesch_kincaid_reward_func
 
-
 # ---------- Main Functions ----------
-def load_model_and_tokenizer(max_seq_length: int = 2048, lora_rank: int = 32, load_in_4bit = False):
+def load_model_and_tokenizer(model_name, max_seq_length: int = 2048, lora_rank: int = 32, load_in_4bit = True):
     model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=MODEL_NAME,
+        model_name=model_name,
         max_seq_length=max_seq_length,
         load_in_4bit=load_in_4bit,
-        fast_inference=True,
-        max_lora_rank=lora_rank,
+        #fast_inference=True,
+        #max_lora_rank=lora_rank,
         gpu_memory_utilization=0.9,
     )
     model = FastLanguageModel.get_peft_model(
@@ -60,9 +45,11 @@ def train(model, tokenizer, dataset,
           save_path: str,
           run_name: str,
           flesch_threshold: float,
-          max_seq_length: int = 2048,
           max_completion_length: int = 250,
-          num_generations: int = 4):
+          num_generations: int = 4,
+          batch_size: int = 4,
+          max_steps: int = 1000,
+          checkpoint_dir: str = 'runs'):
     config = GRPOConfig(
         learning_rate=5e-6,
         adam_beta1=0.9,
@@ -72,16 +59,16 @@ def train(model, tokenizer, dataset,
         lr_scheduler_type="cosine",
         optim="paged_adamw_8bit",
         logging_steps=1,
-        per_device_train_batch_size=1,
+        per_device_train_batch_size=batch_size,
         gradient_accumulation_steps=1,
         num_generations=num_generations,
         max_completion_length=max_completion_length,
-        num_train_epochs=1000,
+        max_steps=max_steps,
         max_grad_norm=0.1,
         report_to="wandb",
-        output_dir="runs",
+        output_dir=checkpoint_dir,
         run_name=run_name,
-        save_steps=250
+        save_steps=100
     )
     trainer = GRPOTrainer(
         model=model,
@@ -91,10 +78,11 @@ def train(model, tokenizer, dataset,
         ],
         args=config,
         train_dataset=dataset,
+        callbacks=[CumulativeSuccessCallback()],
     )
     trainer.train()
-    model.save_lora(f"{save_path}/lora")
-    #model.save_pretrained_merged(f"{save_path}/merged", tokenizer, save_method="lora")
+    
+    model.save_pretrained(save_path)
 
 def setup_wandb(project='GRPO_DIFFICULTY', name='gsm8k'):
     os.environ['WANDB_PROJECT'] = project
@@ -102,25 +90,45 @@ def setup_wandb(project='GRPO_DIFFICULTY', name='gsm8k'):
 
 @click.command()
 @click.option('--project', type=str, default='GRPO_DIFFICULTY')
-@click.option('--name', type=str, default='gsm8k')
-@click.option('--save_path', type=str, default='runs')
+@click.option('--save_dir', type=str, default='models')
 @click.option('--flesch_threshold', '-f', type=float, default=4, help='Flesch-Kincaid grade level threshold for reward function')
-@click.option('--num_generations', '-n', type=int, default=4, help='Number of generations per iteration')
-def main(project, name, save_path, flesch_threshold, num_generations):
-    #os.environ['WANDB_API_KEY'] = '54a50cbe22da3f857fcb7812dd80fedc2ef01ad4'
+@click.option('--num_generations', '-n', type=int, default=8, help='Number of generations per iteration')
+@click.option(
+    '--model-name', '-m',
+    default='unsloth/Qwen3-4B-unsloth-bnb-4bit',
+    show_default=True,
+    help="Model name or path"
+)
+@click.option('--max_steps',
+              type=int,
+              default=1000,
+              help='Number of generations per iteration')
+def main(project, save_dir, flesch_threshold, num_generations, model_name: str,
+         max_steps: int):
+    
     click.echo(f'Using threshold {flesch_threshold}')
+    name = f'photosynthesis{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
     setup_wandb(project=project, name=name)
     
-    model, tokenizer = load_model_and_tokenizer()
-    dataset = create_dataset_from_str(text=PROMPT, tokenizer=tokenizer)
+    model, tokenizer = load_model_and_tokenizer(model_name=model_name)
+    dataset = create_dataset_from_str(tokenizer=tokenizer)
+
+    if not os.path.exists(save_dir):
+        os.mkdir(save_dir)
+
+    save_dir = os.path.join(save_dir, name)
+    checkpoint_dir = os.path.join(save_dir, 'checkpoints')
 
     train(model,
           tokenizer, 
           dataset, 
-          save_path=save_path,
+          save_path=save_dir,
           run_name=name,
           flesch_threshold=flesch_threshold,
-          num_generations=int(num_generations))
+          num_generations=int(num_generations),
+          max_steps=max_steps,
+          checkpoint_dir=checkpoint_dir    
+        )
 
 if __name__ == '__main__':
     main()
