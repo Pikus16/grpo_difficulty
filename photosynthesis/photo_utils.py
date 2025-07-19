@@ -167,7 +167,7 @@ def run_on_all_checkpoints(
 
 
     print(f'Running pretrained')
-    pretrained_avg_score, pretrained_std_score, pretrained_below_thresh = do_single_run(
+    pretrained_avg_score, pretrained_std_score, pretrained_below_thresh, _ = do_single_run(
         model_name,
         None,
         batch_size,
