@@ -36,12 +36,14 @@ def main(save_dir, batch_size, model_name: str,
     
     print(f'Lowest score: {lowest_score}')
     print(f'Highest score: {highest_score}')
+    print(f'Average Score: {avg_score} +/- {std_score}')
     for q, s in quantiles.items():
         print(f'{q}: {s}')
 
     result = {
         'highest_score' : highest_score,
         'lowest_score' : lowest_score,
+        'average_score' : avg_score,
         **quantiles,
     }
     model_name = model_name.replace('/','-')
