@@ -50,3 +50,6 @@ def main(save_dir, batch_size, model_name: str,
         os.mkdir(save_dir)
     with open(f'{save_dir}/scores.json', 'w') as f:
         json.dump(result, f)
+
+if __name__ == '__main__':
+    main()
