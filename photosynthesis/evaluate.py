@@ -20,7 +20,7 @@ import json
 @click.option('--num_generations', '-n', type=int, default=8, help='Number of generations per iteration')
 @click.option('--max_steps',
               type=int,
-              default=1000,
+              default=400,
               help='Number of generations per iteration')
 def main(
     model_name: str,
