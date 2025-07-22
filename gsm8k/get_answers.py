@@ -45,7 +45,7 @@ import json
 @click.option(
     '--difficulty_level',
     type=int, 
-    default=None,
+    default=0,
     help='difficulty for gsm8k')
 @click.option('--num_generations', '-n', type=int, default=8, help='Number of generations per iteration')
 @click.option('--max_steps',
