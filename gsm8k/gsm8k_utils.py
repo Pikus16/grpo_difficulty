@@ -123,23 +123,11 @@ def do_single_run(model_name,
                   ds,
                   batch_size,
                   num_repeat,
-                  answers,
-                  output_folder):
+                  answers):
     model, tokenizer = build_model_and_tokenizer(model_name=model_name, adapter_name=adapter_name)
 
-    if output_folder is not None:
-        if not os.path.exists(output_folder):
-            os.mkdir(output_folder)
-
-        output_folder = os.path.join(output_folder, f"{dataset_name.replace('/','-')}_{subset}")
-        if not os.path.exists(output_folder):
-            os.mkdir(output_folder)
-
-        if adapter_name is None:
-            output_file = os.path.join(output_folder, f"{model_name.replace('/','-')}.json")
-        else:
-            output_file = os.path.join(output_folder, f"{os.path.basename(adapter_name)}.json")
-
+    if adapter_name is not None:
+        output_file = f'{adapter_name}/responses.json'
         if os.path.exists(output_file):
             with open(output_file, 'r') as f:
                 all_responses = json.load(f)
@@ -147,7 +135,9 @@ def do_single_run(model_name,
         else:
             all_responses = []
     else:
+        output_file = None
         all_responses = []
+
 
     for i in tqdm(range(0, len(ds), batch_size)):
         if i < len(all_responses):
@@ -157,12 +147,12 @@ def do_single_run(model_name,
         questions = batch['question']
         responses = sample_pass_at_k(model, tokenizer, questions, k=num_repeat)
         all_responses.extend(responses)
-        if output_folder is not None:
+        if output_file is not None:
             if i % (10 * batch_size) == 0:
                 #torch.cuda.empty_cache()
                 write_to_file(output_file, all_responses)
 
-    if output_folder is not None:
+    if output_file is not None:
         write_to_file(output_file, all_responses)
 
     # get accuracies and pass@k
@@ -179,7 +169,6 @@ def run_on_all_checkpoints(
     subset: str,
     model_name: str,
     num_repeat: int,
-    output_folder: str,
     batch_size: int,
     adapter_folder: str,
     subset_folder: str,
@@ -220,7 +209,6 @@ def run_on_all_checkpoints(
             batch_size=batch_size,
             num_repeat=num_repeat,
             answers=answers,
-            output_folder=output_folder
         )
         print(f"Checkpoint: {ckpt_num}: Accuracy: {acc:0.3f}, Pass@{num_repeat}: {pass_at_k:0.3f}")
         accuracies.append(acc)
@@ -235,8 +223,7 @@ def run_on_all_checkpoints(
         ds=ds,
         batch_size=batch_size,
         num_repeat=num_repeat,
-        answers=answers,
-        output_folder=output_folder
+        answers=answers
     )
     print(f"Base: Accuracy: {pretrained_accuracy:0.3f}, Pass@{num_repeat}: {pretrained_passes:0.3f}")
 

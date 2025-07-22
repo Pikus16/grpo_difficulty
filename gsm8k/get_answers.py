@@ -72,16 +72,14 @@ def main(
         subset=subset,
         model_name=model_name,
         num_repeat=num_repeat,
-        output_folder=output_folder,
         batch_size=batch_size,
         adapter_folder=checkpoint_dir,
         subset_folder=subset_folder,
         difficulty_level=difficulty_level
     )
 
-    if output_folder is not None:
-       with open(os.path.join(output_folder, f'{subset}_results.json'), 'w') as f:
-          json.dump(results, f)
+    with open(os.path.join(checkpoint_dir, f'test_results.json'), 'w') as f:
+        json.dump(results, f)
     
 
 
