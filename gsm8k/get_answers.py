@@ -36,8 +36,6 @@ import json
 )
 @click.option('--batch-size', '-b', default=32, 
               show_default=True, help="Number of questions to batch together")
-@click.option('--adapter-folder', '-a', default='runs', 
-              show_default=True, help="Folder with checkpoints")
 @click.option(
     '--subset_folder',
     default='accuracy_subset',
@@ -49,6 +47,11 @@ import json
     type=int, 
     default=None,
     help='difficulty for gsm8k')
+@click.option('--num_generations', '-n', type=int, default=8, help='Number of generations per iteration')
+@click.option('--max_steps',
+              type=int,
+              default=1000,
+              help='Number of generations per iteration')
 def main(
     dataset_name: str,
     subset: str,
@@ -56,20 +59,24 @@ def main(
     num_repeat: int,
     output_folder: str,
     batch_size: int,
-    adapter_folder: str, 
     subset_folder: str,
-    difficulty_level:int
+    difficulty_level:int,
+    num_generations: int,
+    max_steps:int,
 ):
+    
+    name = f'{dataset_name}_difficulty{difficulty_level}_{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
+    checkpoint_dir = os.path.join('models',name,'checkpoints')
     results = run_on_all_checkpoints(
-        dataset_name,
-        subset,
-        model_name,
-        num_repeat,
-        output_folder,
-        batch_size,
-        adapter_folder,
-        subset_folder,
-        difficulty_level
+        dataset_name=dataset_name,
+        subset=subset,
+        model_name=model_name,
+        num_repeat=num_repeat,
+        output_folder=output_folder,
+        batch_size=batch_size,
+        adapter_folder=checkpoint_dir,
+        subset_folder=subset_folder,
+        difficulty_level=difficulty_level
     )
 
     if output_folder is not None:
