@@ -196,12 +196,12 @@ def run_on_all_checkpoints(
     split: str,
     difficulty_level: int
 ):
-    ds = load_shuffleobj_dataset(
+    whole_ds = load_shuffleobj_dataset(
         split=split,
-        difficulty_level=difficulty_level,
-        model_name=model_name
+        #difficulty_level=difficulty_level,
+        #model_name=model_name
     )
-    answers = [x['answer'] for x in ds]
+    answers = [x['answer'] for x in whole_ds]
 
     results = {}
     if adapter_folder is not None:
@@ -220,7 +220,7 @@ def run_on_all_checkpoints(
                 model_name,
                 adapter_name,
                 split,
-                ds,
+                whole_ds,
                 batch_size,
                 num_repeat,
                 answers
@@ -244,7 +244,7 @@ def run_on_all_checkpoints(
         model_name,
         None, # setting to None so pretrained
         split,
-        ds,
+        whole_ds,
         batch_size,
         num_repeat,
         answers
