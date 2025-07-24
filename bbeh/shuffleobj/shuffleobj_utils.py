@@ -143,7 +143,7 @@ def check_subset_acc(all_accs, model_name, split, difficulty_level) -> float:
         base_accs = json.load(f)
     inds = np.where(np.array(base_accs) <= difficulty_level)[0]
     assert len(all_accs) == len(load_shuffleobj_dataset(split=split))
-    return np.mean(all_accs[inds])
+    return np.mean(np.array(all_accs)[inds])
 
 def do_single_run(
     model_name,
