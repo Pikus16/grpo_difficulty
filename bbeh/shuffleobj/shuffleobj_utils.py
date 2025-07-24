@@ -170,6 +170,7 @@ def run_on_all_checkpoints(
     ds = load_shuffleobj_dataset(subset=subset)
     answers = [x['answer'] for x in ds]
 
+
     if adapter_folder is not None:
         assert os.path.exists(adapter_folder)
         all_adapters = glob(f'{adapter_folder}/checkpoint-*')
@@ -192,6 +193,11 @@ def run_on_all_checkpoints(
             print(f"Checkpoint: {ckpt_num}: Accuracy: {acc:0.3f}, Pass@{num_repeat}: {pass_at_k:0.3f}")
             accuracies.append(acc)
             passes.append(pass_at_k)
+        ckpt_results = {
+            'checkpoint': checkpoint_numbers,
+            'accuracy': accuracies,
+            f'pass@{num_repeat}': passes,
+        }
 
     print(f'Running pretrained')
     pretrained_accuracy, pretrained_passes = do_single_run(
@@ -206,9 +212,7 @@ def run_on_all_checkpoints(
     print(f"Base: Accuracy: {pretrained_accuracy:0.3f}, Pass@{num_repeat}: {pretrained_passes:0.3f}")
     
     results = {
-        'checkpoint': checkpoint_numbers,
-        'accuracy': accuracies,
-        f'pass@{num_repeat}': passes,
+        **ckpt_results,
         'base accuracy' : pretrained_accuracy,
          f'base pass@{num_repeat}': pretrained_passes,
     }
