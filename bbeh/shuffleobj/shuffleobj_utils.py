@@ -145,16 +145,22 @@ def do_single_run(
     batch_size,
     num_repeat,
     answers,
+    difficulty_level
 ):
     model, tokenizer = build_model_and_tokenizer(model_name=model_name, adapter_name=adapter_name)
 
+    if difficulty_level is None:
+        file_basename = f'{split}_responses.json'
+    else:
+        file_basename = f'{split}_difficulty{difficulty_level}_responses.json'
+
     if adapter_name is not None:
-        output_file = f'{adapter_name}/{split}_responses.json'
+        output_file = f'{adapter_name}/{file_basename}'
     else:
         output_dir = f"pretrained_responses/{model_name.replace('/','-')}"
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
-        output_file = os.path.join(output_dir, f'{split}_responses.json')
+        output_file = os.path.join(output_dir, file_basename)
     all_responses = load_output_file(output_file)
 
     for i in tqdm(range(0, len(ds), batch_size)):
@@ -182,19 +188,14 @@ def do_single_run(
         pass_at_k.append(1 if answer in preds else 0)
     return np.mean(accs), np.mean(pass_at_k)
 
-def run_on_all_checkpoints(
+def full_run(ds,
     model_name: str,
     num_repeat: int,
     batch_size: int,
     adapter_folder: str,
     split: str,
-    difficulty_level: int
+    difficulty_level:int = None
 ):
-    ds = load_shuffleobj_dataset(
-        split=split,
-        difficulty_level=difficulty_level,
-        model_name=model_name
-    )
     answers = [x['answer'] for x in ds]
 
     results = {}
@@ -215,7 +216,8 @@ def run_on_all_checkpoints(
                 ds,
                 batch_size,
                 num_repeat,
-                answers
+                answers,
+                difficulty_level=difficulty_level
             )
             print(f"Checkpoint: {ckpt_num}: Accuracy: {acc:0.3f}, Pass@{num_repeat}: {pass_at_k:0.3f}")
             accuracies.append(acc)
@@ -232,11 +234,32 @@ def run_on_all_checkpoints(
         ds,
         batch_size,
         num_repeat,
-        answers
+        answers,
+        difficulty_level=difficulty_level
     )
     print(f"Base: Accuracy: {pretrained_accuracy:0.3f}, Pass@{num_repeat}: {pretrained_passes:0.3f}")
     
     results[ 'base accuracy'] = pretrained_accuracy
     results[f'base pass@{num_repeat}'] =  pretrained_passes
     return results
+
+def run_on_all_checkpoints(
+    model_name: str,
+    num_repeat: int,
+    batch_size: int,
+    adapter_folder: str,
+    split: str,
+    difficulty_level: int
+):
+    full_ds = load_shuffleobj_dataset(split=split)
+    results_full = full_run(full_ds, model_name, num_repeat, batch_size, adapter_folder, split, difficulty_level=None)
+    if difficulty_level is not None:
+        full_ds = load_shuffleobj_dataset(split=split)
+        results_difficulty = full_run(full_ds, model_name, num_repeat, batch_size, adapter_folder, split, difficulty_level=difficulty_level)
+        return {
+            f'whole {split}' : results_full,
+            f'{difficulty_level} {split}' : results_difficulty
+        }
+    else:
+        return results_full
     
