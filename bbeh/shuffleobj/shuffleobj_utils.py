@@ -131,7 +131,8 @@ def do_single_run(
             all_responses = []
     else:
         output_dir = f"pretrained_responses/{model_name.replace('/','-')}"
-        os.makedirs(output_dir)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
         output_file = os.path.join(output_dir, f'{subset}_responses.json')
         all_responses = []
 
