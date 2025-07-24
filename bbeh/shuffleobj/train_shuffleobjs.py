@@ -156,16 +156,29 @@ def log_inference_results(results):
 @click.option('--load_4bit', '-l',
               is_flag=True,
               help='Load model in 4-bit mode (flag)')
+@click.option(
+    '--difficulty_level',
+    type=int, 
+    default=None,
+    help='If specified, will load difficulty subset')
 def main(project: str,
          save_dir: str, 
          num_generations: int,
          model_name: str,
          max_steps: int,
-         load_4bit: bool):
+         load_4bit: bool,
+         difficulty_level: int):
     name = f'bbeh-shuffleobj_{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
+    if difficulty_level is not None:
+        name += f'_difficulty{difficulty_level}'
     setup_wandb(project=project, name=name)
 
-    dataset = load_shuffleobj_dataset(subset='train')
+    dataset = load_shuffleobj_dataset(
+        split='train',
+        difficulty_level=difficulty_level,
+        model_name=model_name
+    )
+    
     click.echo(f'Loaded train dataset of size {len(dataset)}')
     model, tokenizer = load_model_and_tokenizer(model_name=model_name, load_in_4bit=load_4bit)
     dataset = format_dataset(dataset, tokenizer)
