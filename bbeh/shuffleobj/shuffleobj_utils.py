@@ -141,7 +141,8 @@ def check_subset_acc(all_accs, model_name, split, difficulty_level) -> float:
     base_accs_path = os.path.join(dirname, 'dset', 'pretrained_scores', model_name.replace('/','-'), f'{split}.json')
     with open(base_accs_path) as f:
         base_accs = json.load(f)
-    inds = np.where(np.array(base_accs) <= difficulty_level)[0]
+    diff_float = int(difficulty_level) / 100
+    inds = np.where(np.array(base_accs) <= diff_float)[0]
     assert len(all_accs) == len(load_shuffleobj_dataset(split=split))
     return np.mean(np.array(all_accs)[inds])
 
