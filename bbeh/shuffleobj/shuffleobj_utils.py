@@ -130,7 +130,9 @@ def do_single_run(
         else:
             all_responses = []
     else:
-        output_file = None
+        output_dir = f"pretrained_responses/{model_name.replace('/','-')}"
+        os.makedirs(output_dir)
+        output_file = os.path.join(output_dir, f'{subset}_responses.json')
         all_responses = []
 
     for i in tqdm(range(0, len(ds), batch_size)):
