@@ -54,7 +54,7 @@ def build_model_and_tokenizer(model_name, adapter_name=None, device: str = 'cuda
     model = AutoModelForCausalLM.from_pretrained(
         model_name, 
         trust_remote_code=True,
-        torch_dtype=torch.float16,  # Use half precision
+        torch_dtype=torch.bfloat16,  # Use half precision
         device_map="auto",          # Automatic device placement
         use_cache=True
     )
