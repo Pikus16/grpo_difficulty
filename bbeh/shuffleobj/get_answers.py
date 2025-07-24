@@ -29,16 +29,19 @@ import json
               type=int,
               default=1000,
               help='Number of generations per iteration')
+@click.option('--no-checkpoints', is_flag=True, default=False,
+              help='If set, do not run on checkpoints (checkpoint_dir=None)')
 def main(
     model_name: str,
     num_repeat: int,
     batch_size: int,
     subset: str,
     num_generations: int,
-    max_steps: int
+    max_steps: int,
+    no_checkpoints: bool
 ):
     name = f'bbeh-shuffleobj_{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
-    checkpoint_dir = os.path.join('models',name,'checkpoints')
+    checkpoint_dir = None if no_checkpoints else os.path.join('models', name, 'checkpoints')
     results = run_on_all_checkpoints(
         model_name,
         num_repeat,
@@ -47,8 +50,9 @@ def main(
         subset
     )
 
-    with open(os.path.join(checkpoint_dir, f'{subset}_results.json'), 'w') as f:
-        json.dump(results, f)
+    if checkpoint_dir:
+        with open(os.path.join(checkpoint_dir, f'{subset}_results.json'), 'w') as f:
+            json.dump(results, f)
 
 
 if __name__ == '__main__':
