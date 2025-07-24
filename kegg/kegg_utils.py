@@ -51,10 +51,12 @@ def format_question_qwen(prompts: list[str], tokenizer, device='cuda'):
 def build_model_and_tokenizer(model_name, adapter_name=None, device: str = 'cuda'):
     # 1) Load tokenizer & model
     tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-    model = (
-        AutoModelForCausalLM
-        .from_pretrained(model_name, trust_remote_code=True)
-        .to(device)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name, 
+        trust_remote_code=True,
+        torch_dtype=torch.float16,  # Use half precision
+        device_map="auto",          # Automatic device placement
+        use_cache=True
     )
     if adapter_name is not None:
         model.load_adapter(adapter_name)
