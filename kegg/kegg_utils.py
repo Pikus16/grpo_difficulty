@@ -139,10 +139,7 @@ def do_single_run(
         output_file = os.path.join(output_dir, f'{subset}_responses.json')
     all_responses = load_output_file(output_file)
 
-    for i in tqdm(range(0, len(ds), batch_size)):
-        if i < len(all_responses):
-            continue
-        
+    for i in tqdm(range(len(all_responses), len(ds), batch_size)):
         batch = ds[i: i + batch_size]
         questions = batch['prompt']
         responses = sample_pass_at_k(model, tokenizer, questions, k=num_repeat)
