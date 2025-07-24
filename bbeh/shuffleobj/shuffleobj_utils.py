@@ -243,7 +243,7 @@ def run_on_all_checkpoints(
             results[f'{difficulty_level} accuracy'] = subset_accuracy
 
     print(f'Running pretrained')
-    pretrained_accuracy, pretrained_passes, per_example_acc = do_single_run(
+    pretrained_accuracy, pretrained_passes, pretrained_per_example_acc = do_single_run(
         model_name,
         None, # setting to None so pretrained
         split,
@@ -259,6 +259,6 @@ def run_on_all_checkpoints(
     if difficulty_level is not None:
         test_subset_acc = check_subset_acc(per_example_acc, model_name, split, difficulty_level)
         print(f'Test Set {difficulty_level} Accuracy: {test_subset_acc:0.3f}')
-        results[f'base {difficulty_level} accuracy'] = subset_accuracy
+        results[f'base {difficulty_level} accuracy'] = pretrained_per_example_acc
     return results
     
