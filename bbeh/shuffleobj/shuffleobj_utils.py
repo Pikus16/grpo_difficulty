@@ -9,18 +9,34 @@ import os
 import numpy as np
 from glob import glob
 
-def load_shuffleobj_dataset(subset: str, dset_path=None):
-     if dset_path is None:
-        # get file directory
+def load_shuffleobj_dataset(
+        split: str,
+        dset_path=None,
+        difficulty_level: int = None,
+        model_name: str = None
+    ):
+    if difficulty_level is None:
+        # Load whole split
+        if dset_path is None:
+            # get file directory
+            dirname = os.path.dirname(os.path.abspath(__file__))
+            dset_path = os.path.join(dirname, 'dset')
+        data_file = f'{dset_path}/{split}.json'
+    else:
+        # load just subset of interest
         dirname = os.path.dirname(os.path.abspath(__file__))
-        dset_path = os.path.join(dirname, 'dset')
-
-     ds = load_dataset(
+        data_file = os.path.join(dirname,
+                                'subsets', 
+                                f"{model_name.replace('/','-')}", 
+                                split, 
+                                f'{difficulty_level}.json')
+    assert os.path.exists(data_file)
+    ds = load_dataset(
         "json", 
-        data_files=f'{dset_path}/{subset}.json', 
+        data_files=data_file, 
         split="train"
-     )
-     return ds
+    )
+    return ds
 
 
 def extract_boxed_content(text: str) -> str:
@@ -123,7 +139,7 @@ def load_output_file(path) -> list:
 def do_single_run(
     model_name,
     adapter_name,
-    subset,
+    split,
     ds,
     batch_size,
     num_repeat,
@@ -132,12 +148,12 @@ def do_single_run(
     model, tokenizer = build_model_and_tokenizer(model_name=model_name, adapter_name=adapter_name)
 
     if adapter_name is not None:
-        output_file = f'{adapter_name}/{subset}_responses.json'
+        output_file = f'{adapter_name}/{split}_responses.json'
     else:
         output_dir = f"pretrained_responses/{model_name.replace('/','-')}"
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
-        output_file = os.path.join(output_dir, f'{subset}_responses.json')
+        output_file = os.path.join(output_dir, f'{split}_responses.json')
     all_responses = load_output_file(output_file)
 
     for i in tqdm(range(0, len(ds), batch_size)):
@@ -170,9 +186,9 @@ def run_on_all_checkpoints(
     num_repeat: int,
     batch_size: int,
     adapter_folder: str,
-    subset: str
+    split: str
 ):
-    ds = load_shuffleobj_dataset(subset=subset)
+    ds = load_shuffleobj_dataset(split=split)
     answers = [x['answer'] for x in ds]
 
     results = {}
@@ -189,7 +205,7 @@ def run_on_all_checkpoints(
             acc, pass_at_k = do_single_run(
                 model_name,
                 adapter_name,
-                subset,
+                split,
                 ds,
                 batch_size,
                 num_repeat,
@@ -206,7 +222,7 @@ def run_on_all_checkpoints(
     pretrained_accuracy, pretrained_passes = do_single_run(
         model_name,
         None, # setting to None so pretrained
-        subset,
+        split,
         ds,
         batch_size,
         num_repeat,
