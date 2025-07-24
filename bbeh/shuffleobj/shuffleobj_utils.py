@@ -138,7 +138,7 @@ def load_output_file(path) -> list:
 
 def check_subset_acc(all_accs, model_name, split, difficulty_level) -> float:
     dirname = os.path.dirname(os.path.abspath(__file__))
-    base_accs_path = os.path.join(dirname, 'dset', 'pretrained_scores', model_name.replace('/','-'), split, f'{difficulty_level}.json')
+    base_accs_path = os.path.join(dirname, 'dset', 'pretrained_scores', model_name.replace('/','-'), f'{split}.json')
     with open(base_accs_path) as f:
         base_accs = json.load(f)
     inds = np.where(np.array(base_accs) <= difficulty_level)[0]
