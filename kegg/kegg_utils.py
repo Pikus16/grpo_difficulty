@@ -108,6 +108,15 @@ def write_to_file(destination, all_responses):
     with open(destination, 'w') as f:
         json.dump(all_responses, f)
 
+def load_output_file(path) -> list:
+    if os.path.exists(path):
+        with open(path, 'r') as f:
+            all_responses = json.load(f)
+        print(f"Loaded {len(all_responses)} responses from {path}")
+    else:
+        all_responses = []
+    return all_responses
+
 def do_single_run(
     model_name,
     adapter_name,
@@ -121,15 +130,12 @@ def do_single_run(
 
     if adapter_name is not None:
         output_file = f'{adapter_name}/{subset}_responses.json'
-        if os.path.exists(output_file):
-            with open(output_file, 'r') as f:
-                all_responses = json.load(f)
-            print(f"Loaded {len(all_responses)} responses from {output_file}")
-        else:
-            all_responses = []
     else:
-        output_file = None
-        all_responses = []
+        output_dir = f"pretrained_responses/{model_name.replace('/','-')}"
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        output_file = os.path.join(output_dir, f'{subset}_responses.json')
+    all_responses = load_output_file(output_file)
 
     for i in tqdm(range(0, len(ds), batch_size)):
         if i < len(all_responses):
@@ -163,6 +169,7 @@ def run_on_all_checkpoints(
     adapter_folder: str,
     subset: str
 ):
+    results = {}
     if adapter_folder is not None:
         assert os.path.exists(adapter_folder)
         all_adapters = glob(f'{adapter_folder}/checkpoint-*')
@@ -183,6 +190,9 @@ def run_on_all_checkpoints(
             print(f"Checkpoint: {ckpt_num}: Accuracy: {acc:0.3f}, Pass@{num_repeat}: {pass_at_k:0.3f}")
             accuracies.append(acc)
             passes.append(pass_at_k)
+        results['checkpoint'] = checkpoint_numbers
+        results['accuracy'] = accuracies
+        results[f'pass@{num_repeat}'] = passes
 
     print(f'Running pretrained')
     pretrained_accuracy, pretrained_passes = do_single_run(
@@ -194,12 +204,7 @@ def run_on_all_checkpoints(
     )
     print(f"Base: Accuracy: {pretrained_accuracy:0.3f}, Pass@{num_repeat}: {pretrained_passes:0.3f}")
     
-    results = {
-        'checkpoint': checkpoint_numbers,
-        'accuracy': accuracies,
-        f'pass@{num_repeat}': passes,
-        'base accuracy' : pretrained_accuracy,
-         f'base pass@{num_repeat}': pretrained_passes,
-    }
+    results[ 'base accuracy'] = pretrained_accuracy
+    results[f'base pass@{num_repeat}'] =  pretrained_passes
     return results
     
