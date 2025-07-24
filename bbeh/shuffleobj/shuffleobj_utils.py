@@ -110,6 +110,16 @@ def write_to_file(destination, all_responses):
     with open(destination, 'w') as f:
         json.dump(all_responses, f)
 
+def load_output_file(path) -> list:
+    if os.path.exists(path):
+        with open(path, 'r') as f:
+            all_responses = json.load(f)
+        print(f"Loaded {len(all_responses)} responses from {path}")
+    else:
+        all_responses = []
+    return all_responses
+
+
 def do_single_run(
     model_name,
     adapter_name,
@@ -123,18 +133,12 @@ def do_single_run(
 
     if adapter_name is not None:
         output_file = f'{adapter_name}/{subset}_responses.json'
-        if os.path.exists(output_file):
-            with open(output_file, 'r') as f:
-                all_responses = json.load(f)
-            print(f"Loaded {len(all_responses)} responses from {output_file}")
-        else:
-            all_responses = []
     else:
         output_dir = f"pretrained_responses/{model_name.replace('/','-')}"
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         output_file = os.path.join(output_dir, f'{subset}_responses.json')
-        all_responses = []
+    all_responses = load_output_file(output_file)
 
     for i in tqdm(range(0, len(ds), batch_size)):
         if i < len(all_responses):
