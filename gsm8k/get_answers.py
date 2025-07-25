@@ -52,6 +52,8 @@ import json
               type=int,
               default=1000,
               help='Number of generations per iteration')
+@click.option('--no-checkpoints', is_flag=True, default=False,
+              help='If set, do not run on checkpoints (checkpoint_dir=None)')
 def main(
     dataset_name: str,
     subset: str,
@@ -63,10 +65,11 @@ def main(
     difficulty_level:int,
     num_generations: int,
     max_steps:int,
+    no_checkpoints: bool,
 ):
     
     name = f'{dataset_name}_difficulty{difficulty_level}_{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
-    checkpoint_dir = os.path.join('models',name,'checkpoints')
+    checkpoint_dir = None if no_checkpoints else os.path.join('models', name, 'checkpoints')
     results = run_on_all_checkpoints(
         dataset_name=dataset_name,
         subset=subset,
@@ -78,8 +81,9 @@ def main(
         difficulty_level=difficulty_level
     )
 
-    with open(os.path.join(checkpoint_dir, f'test_results.json'), 'w') as f:
-        json.dump(results, f)
+    if checkpoint_dir:
+        with open(os.path.join(checkpoint_dir, f'test_results.json'), 'w') as f:
+            json.dump(results, f)
     
 
 
