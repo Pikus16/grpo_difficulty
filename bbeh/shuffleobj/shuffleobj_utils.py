@@ -257,7 +257,7 @@ def run_on_all_checkpoints(
     results[ 'base accuracy'] = pretrained_accuracy
     results[f'base pass@{num_repeat}'] =  pretrained_passes
     if difficulty_level is not None:
-        test_subset_acc = check_subset_acc(per_example_acc, model_name, split, difficulty_level)
+        test_subset_acc = check_subset_acc(pretrained_per_example_acc, model_name, split, difficulty_level)
         print(f'Test Set {difficulty_level} Accuracy: {test_subset_acc:0.3f}')
         results[f'base {difficulty_level} accuracy'] = test_subset_acc
     return results
