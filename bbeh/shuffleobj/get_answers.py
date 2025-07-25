@@ -32,10 +32,15 @@ import json
 @click.option('--no-checkpoints', is_flag=True, default=False,
               help='If set, do not run on checkpoints (checkpoint_dir=None)')
 @click.option(
-    '--difficulty_level',
+    '--model_difficulty_level',
     type=int, 
     default=None,
-    help='If specified, will load difficulty subset')
+    help='If specified, will load model trained on difficulty subset')
+@click.option(
+    '--inference_difficulty_level',
+    type=int, 
+    default=None,
+    help='If specified, will calculate performance on difficulty subset as well as whole set')
 def main(
     model_name: str,
     num_repeat: int,
@@ -44,11 +49,12 @@ def main(
     num_generations: int,
     max_steps: int,
     no_checkpoints: bool,
-    difficulty_level: int
+    model_difficulty_level: int,
+    inference_difficulty_level
 ):
     name = f'bbeh-shuffleobj_{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
-    if difficulty_level is not None:
-        name += f'_difficulty{difficulty_level}'
+    if model_difficulty_level is not None:
+        name += f'_difficulty{model_difficulty_level}'
     checkpoint_dir = None if no_checkpoints else os.path.join('models', name, 'checkpoints')
     results = run_on_all_checkpoints(
         model_name,
@@ -56,7 +62,7 @@ def main(
         batch_size,
         checkpoint_dir,
         split,
-        difficulty_level=difficulty_level
+        difficulty_level=inference_difficulty_level
     )
 
     if checkpoint_dir:
