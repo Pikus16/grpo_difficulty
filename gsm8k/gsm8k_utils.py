@@ -188,31 +188,38 @@ def run_on_all_checkpoints(
             subset=subset
         )
         answers = [x['answer'] for x in ds]
+
+    results = {}
+    if adapter_folder is not None:
         
-    assert os.path.exists(adapter_folder)
+        assert os.path.exists(adapter_folder)
 
-    all_adapters = glob(f'{adapter_folder}/checkpoint-*')
+        all_adapters = glob(f'{adapter_folder}/checkpoint-*')
 
-    checkpoint_numbers = sorted([int(os.path.basename(path).split('-')[1]) for path in all_adapters])
-    print(f'Running on checkpoints: {checkpoint_numbers}')
+        checkpoint_numbers = sorted([int(os.path.basename(path).split('-')[1]) for path in all_adapters])
+        print(f'Running on checkpoints: {checkpoint_numbers}')
 
-    accuracies, passes = [], []
-    for ckpt_num in checkpoint_numbers:
-        adapter_name = f'{adapter_folder}/checkpoint-{ckpt_num}'
-        assert os.path.exists(adapter_name)
-        acc, pass_at_k = do_single_run(
-            model_name=model_name,
-            adapter_name=adapter_name,
-            dataset_name=dataset_name,
-            subset=subset,
-            ds=ds,
-            batch_size=batch_size,
-            num_repeat=num_repeat,
-            answers=answers,
-        )
-        print(f"Checkpoint: {ckpt_num}: Accuracy: {acc:0.3f}, Pass@{num_repeat}: {pass_at_k:0.3f}")
-        accuracies.append(acc)
-        passes.append(pass_at_k)
+        accuracies, passes = [], []
+        for ckpt_num in checkpoint_numbers:
+            adapter_name = f'{adapter_folder}/checkpoint-{ckpt_num}'
+            assert os.path.exists(adapter_name)
+            acc, pass_at_k = do_single_run(
+                model_name=model_name,
+                adapter_name=adapter_name,
+                dataset_name=dataset_name,
+                subset=subset,
+                ds=ds,
+                batch_size=batch_size,
+                num_repeat=num_repeat,
+                answers=answers,
+            )
+            print(f"Checkpoint: {ckpt_num}: Accuracy: {acc:0.3f}, Pass@{num_repeat}: {pass_at_k:0.3f}")
+            accuracies.append(acc)
+            passes.append(pass_at_k)
+
+        results['checkpoint'] = checkpoint_numbers
+        results['accuracy'] = accuracies
+        results[f'pass@{num_repeat}'] = passes
 
     print(f'Running pretrained')
     pretrained_accuracy, pretrained_passes = do_single_run(
@@ -227,11 +234,6 @@ def run_on_all_checkpoints(
     )
     print(f"Base: Accuracy: {pretrained_accuracy:0.3f}, Pass@{num_repeat}: {pretrained_passes:0.3f}")
 
-    results = {
-        'checkpoint': checkpoint_numbers,
-        'accuracy': accuracies,
-        f'pass@{num_repeat}': passes,
-        'base accuracy' : pretrained_accuracy,
-         f'base pass@{num_repeat}': pretrained_passes,
-    }
+    results[ 'base accuracy'] = pretrained_accuracy
+    results[f'base pass@{num_repeat}'] =  pretrained_passes
     return results
