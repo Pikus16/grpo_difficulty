@@ -101,13 +101,20 @@ def setup_wandb(project='GRPO_DIFFICULTY', name='gsm8k'):
               type=int,
               default=1000,
               help='Number of generations per iteration')
+@click.option(
+    '--difficulty_level',
+    type=int, 
+    default=None,
+    help='If specified, will load difficulty subset')
 def main(project, save_dir, num_generations, model_name: str,
-         max_steps: int):
+         max_steps: int, difficulty_level: int):
     name = f'kegg_{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
+    if difficulty_level is not None:
+        name += f'_difficulty{difficulty_level}'
     setup_wandb(project=project, name=name)
     
     model, tokenizer = load_model_and_tokenizer(model_name=model_name)
-    dataset = load_kegg_dataset(split='train', tokenizer=tokenizer)
+    dataset = load_kegg_dataset(split='train', tokenizer=tokenizer, model_name=model_name, difficulty_level=difficulty_level)
     click.echo(f'Loaded train dataset of size {len(dataset)}')
 
     if not os.path.exists(save_dir):

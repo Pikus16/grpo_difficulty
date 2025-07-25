@@ -19,7 +19,7 @@ import json
 @click.option('--batch-size', '-b', default=8, 
               show_default=True, help="Number of questions to batch together")
 @click.option(
-    '--subset', '-s',
+    '--split', '-s',
     default='test',
     show_default=True,
     help="Dataset split to use"
@@ -31,27 +31,42 @@ import json
               help='Number of generations per iteration')
 @click.option('--no-checkpoints', is_flag=True, default=False,
               help='If set, do not run on checkpoints (checkpoint_dir=None)')
+@click.option(
+    '--model_difficulty_level',
+    type=int, 
+    default=None,
+    help='If specified, will load model trained on difficulty subset')
+@click.option(
+    '--inference_difficulty_level',
+    type=int, 
+    default=None,
+    help='If specified, will calculate performance on difficulty subset as well as whole set')
 def main(
     model_name: str,
     num_repeat: int,
     batch_size: int,
-    subset: str,
+    split: str,
     num_generations: int,
     max_steps: int,
-    no_checkpoints: bool
+    no_checkpoints: bool,
+    model_difficulty_level: int,
+    inference_difficulty_level
 ):
     name = f'kegg_{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
+    if model_difficulty_level is not None:
+        name += f'_difficulty{model_difficulty_level}'
     checkpoint_dir = None if no_checkpoints else os.path.join('models', name, 'checkpoints')
     results = run_on_all_checkpoints(
         model_name,
         num_repeat,
         batch_size,
         checkpoint_dir,
-        subset
+        split,
+        difficulty_level=inference_difficulty_level
     )
 
     if checkpoint_dir:
-        with open(os.path.join(checkpoint_dir, f'{subset}_results.json'), 'w') as f:
+        with open(os.path.join(checkpoint_dir, f'{split}_results.json'), 'w') as f:
             json.dump(results, f)
 
 
