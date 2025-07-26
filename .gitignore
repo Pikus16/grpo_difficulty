@@ -1,0 +1,21 @@
+tokenizer.json
+*.pt
+*.pth
+merges.txt
+chat_template.jinja
+special_tokens_map.json
+tokenizer_config.json
+trainer_state.json
+training_args.bin
+vocab.json
+adapter_config.json
+*.safetensors
+added_tokens.json
+__pycache__
+wandb
+
+# Ignore all README.md files not at the root level
+**/README.md
+
+# But do NOT ignore the root README.md
+!/README.md
