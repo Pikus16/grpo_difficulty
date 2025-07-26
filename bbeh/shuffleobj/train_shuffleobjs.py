@@ -158,7 +158,7 @@ def log_inference_results(results):
               help='Load model in 4-bit mode (flag)')
 @click.option(
     '--difficulty_level',
-    type=int, 
+    type=str, 
     default=None,
     help='If specified, will load difficulty subset')
 def main(project: str,
