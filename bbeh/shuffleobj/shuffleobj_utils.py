@@ -25,18 +25,11 @@ def load_shuffleobj_dataset(
     else:
         # load just subset of interest
         dirname = os.path.dirname(os.path.abspath(__file__))
-        if 'random' in difficulty_level:
-            data_file = os.path.join(dirname,
-                                    'subsets', 
-                                    f"{model_name.replace('/','-')}", 
-                                    split, 
-                                    f'{difficulty_level}.json')
-        else:
-            data_file = os.path.join(dirname,
-                                    'subsets', 
-                                    f"{model_name.replace('/','-')}", 
-                                    split, 
-                                    f'{difficulty_level}.json')
+        data_file = os.path.join(dirname,
+            'subsets', 
+            f"{model_name.replace('/','-')}", 
+            split, 
+            f'{difficulty_level}.json')
     assert os.path.exists(data_file)
     ds = load_dataset(
         "json", 
