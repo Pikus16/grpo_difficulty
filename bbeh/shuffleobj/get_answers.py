@@ -33,7 +33,7 @@ import json
               help='If set, do not run on checkpoints (checkpoint_dir=None)')
 @click.option(
     '--model_difficulty_level',
-    type=int, 
+    type=str, 
     default=None,
     help='If specified, will load model trained on difficulty subset')
 @click.option(
