@@ -103,7 +103,7 @@ def setup_wandb(project='GRPO_DIFFICULTY', name='gsm8k'):
               help='Number of generations per iteration')
 @click.option(
     '--difficulty_level',
-    type=int, 
+    type=str, 
     default=None,
     help='If specified, will load difficulty subset')
 def main(project, save_dir, num_generations, model_name: str,
