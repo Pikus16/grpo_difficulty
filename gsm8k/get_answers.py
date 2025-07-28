@@ -11,7 +11,7 @@ import json
     help="HuggingFace dataset name"
 )
 @click.option(
-    '--subset', '-s',
+    '--split', '-s',
     default='test',
     show_default=True,
     help="Dataset split to use"
@@ -27,12 +27,6 @@ import json
     default=8,
     show_default=True,
     help="Number of samples to generate per question"
-)
-@click.option(
-    '--output_folder', '-o',
-    default=None,
-    show_default=True,
-    help="Output folder to write all responses"
 )
 @click.option('--batch-size', '-b', default=32, 
               show_default=True, help="Number of questions to batch together")
@@ -56,10 +50,9 @@ import json
               help='If set, do not run on checkpoints (checkpoint_dir=None)')
 def main(
     dataset_name: str,
-    subset: str,
+    split: str,
     model_name: str,
     num_repeat: int,
-    output_folder: str,
     batch_size: int,
     subset_folder: str,
     difficulty_level:int,
@@ -72,7 +65,7 @@ def main(
     checkpoint_dir = None if no_checkpoints else os.path.join('models', name, 'checkpoints')
     results = run_on_all_checkpoints(
         dataset_name=dataset_name,
-        subset=subset,
+        split=split,
         model_name=model_name,
         num_repeat=num_repeat,
         batch_size=batch_size,
