@@ -10,15 +10,17 @@ import numpy as np
 from glob import glob
 import wandb
 
+def _get_base_path():
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def _get_dataset_dir():
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dsets')
+    return os.path.join(_get_base_path(), 'dsets')
 
 def _get_responses_dir():
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'responses')
+    return os.path.join(_get_base_path(), 'responses')
 
 def _get_checkpoint_dir(dataset_name: str, name: str):
-    checkpoint_base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'checkpoints')
+    checkpoint_base_dir = os.path.join(_get_base_path(), 'checkpoints')
     return os.path.join(
         checkpoint_base_dir,
         dataset_name,
