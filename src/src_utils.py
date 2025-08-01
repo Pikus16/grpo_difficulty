@@ -38,7 +38,7 @@ def load_whole_dataset(dataset_name: str, split: str, model_name: str = None) ->
     )
     if model_name is not None:
         # load base scores
-        score_file =  os.path.join(dset_base_path, dataset_name, model_name, f'{split}_scores.json')
+        score_file =  os.path.join(dset_base_path, dataset_name, model_name.replace('/','-'), f'{split}_scores.json')
         with open(score_file) as f:
             scores = json.load(f)
         assert len(scores) == len(ds)
