@@ -16,12 +16,27 @@ from src_utils import (
     _get_checkpoint_dir,
     format_dataset_
 )
+
+def create_reward_func(dataset_name):
+    def correctness_reward_func(completions, answer, **kwargs):
+        predictions = np.array([extract_boxed_content(a) for a in completions])
+        answer = np.array([a.lower() for a in answer])
+        scores = answer == predictions
+        return scores.astype(int)
     
-def correctness_reward_func(completions, answer, **kwargs):
-    predictions = np.array([extract_boxed_content(a) for a in completions])
-    answer = np.array([a.lower() for a in answer])
-    scores = answer == predictions
-    return scores.astype(int)
+    def kegg_reward_func(completions, answer, **kwargs):
+        predictions = np.array([extract_boxed_content(a) for a in completions])
+        answer = np.array([a.lower() for a in answer])
+        scores = np.array([
+            a in p if p is not None else False
+            for a, p in zip(answer, predictions)
+        ])
+        return scores.astype(int)
+
+    if dataset_name == 'kegg':
+        return kegg_reward_func
+    else:
+        return correctness_reward_func
 
 # ---------- Main Functions ----------
 def load_train_model_and_tokenizer(model_name, max_seq_length: int = 2048, lora_rank: int = 32, load_in_4bit = True):
@@ -47,6 +62,7 @@ def train(model,
           tokenizer,
           dataset,
           run_name: str,
+          reward_fn, 
           max_completion_length: int = 250,
           num_generations: int = 4,
           batch_size: int = 4,
@@ -77,7 +93,7 @@ def train(model,
         model=model,
         processing_class=tokenizer,
         reward_funcs=[
-            correctness_reward_func,
+            reward_fn,
         ],
         args=config,
         train_dataset=dataset,
@@ -209,7 +225,8 @@ def main(
           run_name=name,
           num_generations=int(num_generations),
           max_steps=max_steps,
-          checkpoint_dir=checkpoint_dir  
+          checkpoint_dir=checkpoint_dir,
+          reward_fn=create_reward_func(dataset_name) 
         )
     
     # clear up memory before inference
