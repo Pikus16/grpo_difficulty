@@ -104,7 +104,7 @@ def extract_boxed_content(text: str) -> str:
     """
     matches = re.findall(r'\\boxed\{(.*?)\}', text)
     try:
-        return str(matches[-1]).strip()
+        return str(matches[-1]).strip().lower()
     except:
         return None
     

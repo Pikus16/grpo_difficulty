@@ -1,13 +1,9 @@
 import unsloth
 from unsloth import FastLanguageModel
 import torch
-import textstat
-from vllm import SamplingParams
 import os
 from trl import GRPOConfig, GRPOTrainer
 import click
-import re
-from datasets import Dataset
 import wandb
 import numpy as np
 import json
@@ -23,7 +19,8 @@ from src_utils import (
     
 def correctness_reward_func(completions, answer, **kwargs):
     predictions = np.array([extract_boxed_content(a) for a in completions])
-    scores = np.array(answer) == predictions
+    answer = np.array([a.lower() for a in answer])
+    scores = answer == predictions
     return scores.astype(int)
 
 # ---------- Main Functions ----------
