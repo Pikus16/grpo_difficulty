@@ -174,7 +174,7 @@ def main(
     max_steps: int,
     load_4bit: bool
 ):
-    name = f'{dataset_name}_{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
+    name = f'{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
 
     dataset = load_whole_dataset(
         dataset_name=dataset_name,
