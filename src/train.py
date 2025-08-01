@@ -195,7 +195,7 @@ def main(
     setup_wandb(project=project, name=f'{dataset_name}_{name}')
     click.echo(f'Loaded train dataset of size {len(dataset)}')
     model, tokenizer = load_train_model_and_tokenizer(model_name=model_name, load_in_4bit=load_4bit)
-    dataset = format_dataset_(dataset, tokenizer)
+    dataset = format_dataset_(dataset, tokenizer, dataset_name)
 
     checkpoint_dir = _get_checkpoint_dir(dataset_name, name)
     click.echo(f'Checkpoint directory: {checkpoint_dir}')
