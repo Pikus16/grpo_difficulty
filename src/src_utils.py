@@ -238,7 +238,7 @@ def do_single_run(
             continue
         
         batch = whole_dataset[i: i + batch_size]
-        questions = batch['question']
+        questions = batch['prompt']
         responses = sample_pass_at_k(model, tokenizer, questions, k=num_repeat)
         all_responses.extend(responses)
         if output_file is not None:
@@ -267,7 +267,9 @@ def format_dataset_(dataset: HFDataset, tokenizer: AutoTokenizer, dataset_name: 
             dataset_name
         )
         return {'prompt' : new_prompt}
-    return dataset.map(_format_prompt)
+    dataset = dataset.map(_format_prompt)
+    dataset = dataset.remove_columns(['question'])
+    return dataset
 
 def run_on_all_checkpoints(
     model_name: str,
