@@ -103,15 +103,26 @@ def train(model,
     
     model.save_pretrained(f'{checkpoint_dir}/final')
 
-def setup_wandb(project, name):
-    os.environ['WANDB_PROJECT'] = project
-    os.environ['WANDB_NAME'] = name
+def setup_wandb(project, name, skip_train):
+    if skip_train:
+        # resume previous run
+        api = wandb.Api()
+        runs = api.runs(f"{wandb.api.default_entity}/{project}")
+        matched = [run.id for run in runs if run.name == name]
+        if len(matched) == 0:
+            raise ValueError(f"No W&B run with name '{name}' found in project '{project}'")
+        id_ = matched[-1].id
+        print(f'Resume run {name} with id {id_}')
+        wandb.init(project=project, name=name, id = id_, resume="must")
+    else:
+        os.environ['WANDB_PROJECT'] = project
+        os.environ['WANDB_NAME'] = name
 
-    # calling init now to save both train and test
-    wandb.init(
-        project=project,
-        name=name
-    )
+        # calling init now to save both train and test
+        wandb.init(
+            project=project,
+            name=name
+        )
 
 def log_inference_results(results):
     """Log inference results to the active wandb run"""
@@ -180,6 +191,7 @@ def log_inference_results(results):
 @click.option('--load_4bit', '-l',
               is_flag=True,
               help='Load model in 4-bit mode (flag)')
+@click.option('--skip_train', is_flag=True, default=False, help="Skip training and directly evaluate")
 def main(
     dataset_name: str,
     strategy: str,
@@ -188,52 +200,54 @@ def main(
     num_generations: int,
     model_name: str,
     max_steps: int,
-    load_4bit: bool
+    load_4bit: bool,
+    skip_train: bool
 ):
     name = f'{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
-
-    dataset = load_whole_dataset(
-        dataset_name=dataset_name,
-        split='train',
-        model_name=model_name
-    )
-    if strategy is not None and subset_perc is not None:
-        click.echo(f'Loading {subset_perc} size subset with strategy {strategy}')
-        name += f'_strategy{strategy}_subsetperc{subset_perc}'
-        dataset = get_dataset_subset(
-            whole_dataset=dataset,
-            strategy = strategy,
-            size = subset_perc
-        )
-    else:
-        click.echo('Using whole dataset')
-    
-    setup_wandb(project=project, name=f'{dataset_name}_{name}')
-    click.echo(f'Loaded train dataset of size {len(dataset)}')
-    model, tokenizer = load_train_model_and_tokenizer(model_name=model_name, load_in_4bit=load_4bit)
-    dataset = format_dataset_(dataset, tokenizer, dataset_name)
+    setup_wandb(project=project, name=f'{dataset_name}_{name}', skip_train=skip_train)
 
     checkpoint_dir = _get_checkpoint_dir(dataset_name, name)
     click.echo(f'Checkpoint directory: {checkpoint_dir}')
 
-    if not os.path.exists(checkpoint_dir):
-        os.makedirs(checkpoint_dir)
-
-    train(model,
-          tokenizer, 
-          dataset,
-          run_name=name,
-          num_generations=int(num_generations),
-          max_steps=max_steps,
-          checkpoint_dir=checkpoint_dir,
-          reward_fn=create_reward_func(dataset_name) 
+    if not skip_train:
+        dataset = load_whole_dataset(
+            dataset_name=dataset_name,
+            split='train',
+            model_name=model_name
         )
-    
-    # clear up memory before inference
-    model.to('cpu')
-    del model
-    del tokenizer
-    torch.cuda.empty_cache()
+        if strategy is not None and subset_perc is not None:
+            click.echo(f'Loading {subset_perc} size subset with strategy {strategy}')
+            name += f'_strategy{strategy}_subsetperc{subset_perc}'
+            dataset = get_dataset_subset(
+                whole_dataset=dataset,
+                strategy = strategy,
+                size = subset_perc
+            )
+        else:
+            click.echo('Using whole dataset')
+        
+        click.echo(f'Loaded train dataset of size {len(dataset)}')
+        model, tokenizer = load_train_model_and_tokenizer(model_name=model_name, load_in_4bit=load_4bit)
+        dataset = format_dataset_(dataset, tokenizer, dataset_name)
+
+        if not os.path.exists(checkpoint_dir):
+            os.makedirs(checkpoint_dir)
+
+        train(model,
+            tokenizer, 
+            dataset,
+            run_name=name,
+            num_generations=int(num_generations),
+            max_steps=max_steps,
+            checkpoint_dir=checkpoint_dir,
+            reward_fn=create_reward_func(dataset_name) 
+            )
+        
+        # clear up memory before inference
+        model.to('cpu')
+        del model
+        del tokenizer
+        torch.cuda.empty_cache()
 
     # Run inference
     results =run_on_all_checkpoints(
