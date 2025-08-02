@@ -204,6 +204,8 @@ def main(
     skip_train: bool
 ):
     name = f'{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
+    if strategy is not None and subset_perc is not None:
+        name += f'_strategy{strategy}_subsetperc{subset_perc}'
     setup_wandb(project=project, name=f'{dataset_name}_{name}', skip_train=skip_train)
 
     checkpoint_dir = _get_checkpoint_dir(dataset_name, name)
@@ -217,7 +219,6 @@ def main(
         )
         if strategy is not None and subset_perc is not None:
             click.echo(f'Loading {subset_perc} size subset with strategy {strategy}')
-            name += f'_strategy{strategy}_subsetperc{subset_perc}'
             dataset = get_dataset_subset(
                 whole_dataset=dataset,
                 strategy = strategy,
