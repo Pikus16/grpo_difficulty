@@ -203,6 +203,7 @@ def load_output_file(path) -> list:
         all_responses = []
     return all_responses
 
+
 def do_single_run(
     model_name,
     adapter_name,
@@ -254,7 +255,7 @@ def do_single_run(
         write_to_file(output_file, all_responses)
 
     # Get accuracies and pass@k
-    answers = [x['answer'] for x in whole_dataset]
+    answers = [x['answer'].lower() for x in whole_dataset]
     assert len(answers) == len(all_responses)
     accs, pass_at_k = [], []
     for answer, responses in zip(answers, all_responses):
