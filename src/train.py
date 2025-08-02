@@ -111,7 +111,7 @@ def setup_wandb(project, name, skip_train):
         matched = [run.id for run in runs if run.name == name]
         if len(matched) == 0:
             raise ValueError(f"No W&B run with name '{name}' found in project '{project}'")
-        id_ = matched[-1].id
+        id_ = matched[-1]
         print(f'Resume run {name} with id {id_}')
         wandb.init(project=project, name=name, id = id_, resume="must")
     else:
