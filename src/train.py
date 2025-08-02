@@ -158,7 +158,6 @@ def log_inference_results(results):
     }
 
     wandb.run.summary.update(metric_dict)
-    wandb.run.summary.update() 
 
     print(f"Logged inference results for {len(checkpoint_numbers)} checkpoints to wandb")
 
