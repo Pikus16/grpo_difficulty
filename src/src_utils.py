@@ -308,6 +308,7 @@ def run_on_all_checkpoints(
             print(f"Checkpoint: {ckpt_num}: Accuracy: {acc:0.3f}, Pass@{num_repeat}: {pass_at_k:0.3f}")
             accuracies.append(acc)
             passes.append(pass_at_k)
+            torch.cuda.empty_cache()
 
         results['checkpoint'] = checkpoint_numbers
         results['accuracy'] = accuracies
