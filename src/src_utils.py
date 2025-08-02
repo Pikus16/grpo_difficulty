@@ -224,7 +224,11 @@ def do_single_run(
 
     # Load current responses
     if adapter_name is not None:
-        output_dir = f'{ _get_responses_dir()}/{dataset_name}/{adapter_name}'
+        output_dir = os.path.join(
+             _get_responses_dir(),
+             dataset_name,
+             '/'.join(adapter_name.split('/')[-2:])
+        )
     else:
         output_dir = f"{_get_dataset_dir}/{dataset_name}/{model_name.replace('/','-')}"
 
