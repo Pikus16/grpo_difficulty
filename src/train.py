@@ -18,7 +18,7 @@ from src_utils import (
 )
 
 def create_reward_func(dataset_name):
-    def correctness_reward_func(completions, answer, **kwargs):
+    def shuffle_correctness_reward_func(completions, answer, **kwargs):
         predictions = np.array([extract_boxed_content(a) for a in completions])
         answer = np.array([a.lower() for a in answer])
         scores = answer == predictions
@@ -32,11 +32,21 @@ def create_reward_func(dataset_name):
             for a, p in zip(answer, predictions)
         ])
         return scores.astype(int)
+    
+    def gsm8k_reward_func(completions, answer, **kwargs):
+        predictions = np.array([int(extract_boxed_content(a)) for a in completions])
+        scores = np.array(answer) == predictions
+        return scores.astype(int)
+
 
     if dataset_name == 'kegg':
         return kegg_reward_func
+    elif dataset_name == 'gsm8k':
+        return gsm8k_reward_func
+    elif dataset_name == 'shuffleobj':
+        return shuffle_correctness_reward_func
     else:
-        return correctness_reward_func
+        raise ValueError(f'Unknown dataset name {dataset_name}')
 
 # ---------- Main Functions ----------
 def load_train_model_and_tokenizer(model_name, max_seq_length: int = 2048, lora_rank: int = 32, load_in_4bit = True):
