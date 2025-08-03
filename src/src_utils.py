@@ -231,7 +231,11 @@ def do_single_run(
              '/'.join(adapter_name.split('/')[-2:])
         )
     else:
-        output_dir = f"{_get_dataset_dir()}/{dataset_name}/{model_name.replace('/','-')}"
+        output_dir = os.path.join(
+            _get_dataset_dir(),
+            dataset_name,
+            model_name.replace('/','-')
+        )
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
