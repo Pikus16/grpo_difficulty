@@ -210,7 +210,12 @@ def calc_accuracy(whole_dataset: HFDataset,
     # Get accuracies and pass@k
     if dataset_name == 'gsm8k':
         answers = [int(x['answer']) for x in whole_dataset]
-        process_fn = lambda x: int(x)
+        def process_fn(x):
+            try:
+                return int(x)
+            except:
+                return None
+            
     elif dataset_name in ['kegg','shuffleobj']:
         answers = [x['answer'].lower() for x in whole_dataset]
         process_fn = lambda x: x
