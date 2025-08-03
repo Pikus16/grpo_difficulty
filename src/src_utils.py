@@ -263,8 +263,8 @@ def do_single_run(
         accs.append(np.mean(answer == preds))
         pass_at_k.append(1 if answer in preds else 0)
 
-    if adapter_name is not None:
-        # Write scores to file
+    if adapter_name is None:
+        # Write scores to file (since pretrained)
         scores_file = os.path.join(output_dir, f'{split}_scores.json')
         if not os.path.exists(scores_file):
             print(f'Writing scores to {scores_file}')
