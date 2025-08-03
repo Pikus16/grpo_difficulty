@@ -262,6 +262,13 @@ def do_single_run(
         preds = np.array([extract_boxed_content(r) for r in responses])
         accs.append(np.mean(answer == preds))
         pass_at_k.append(1 if answer in preds else 0)
+
+    if adapter_name is not None:
+        # Write scores to file
+        scores_file = os.path.join(output_dir, f'{split}_scores.json')
+        if not os.path.exists(scores_file):
+            print(f'Writing scores to {scores_file}')
+            write_to_file(scores_file, accs)
     return np.mean(accs), np.mean(pass_at_k)
 
 def format_dataset_(dataset: HFDataset, tokenizer: AutoTokenizer, dataset_name: str):
