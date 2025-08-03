@@ -39,10 +39,11 @@ def load_whole_dataset(dataset_name: str, split: str, model_name: str = None) ->
     if model_name is not None:
         # load base scores
         score_file =  os.path.join(dset_base_path, dataset_name, model_name.replace('/','-'), f'{split}_scores.json')
-        with open(score_file) as f:
-            scores = json.load(f)
-        assert len(scores) == len(ds)
-        ds = ds.add_column('pretrained_score', scores)
+        if os.path.exists(score_file):
+            with open(score_file) as f:
+                scores = json.load(f)
+            assert len(scores) == len(ds)
+            ds = ds.add_column('pretrained_score', scores)
     return ds
 
 def get_hardest_subset(whole_dataset: HFDataset, size: int) -> HFDataset:
@@ -203,6 +204,27 @@ def load_output_file(path) -> list:
         all_responses = []
     return all_responses
 
+def calc_accuracy(whole_dataset: HFDataset,
+                  all_responses: list[list[str]],
+                  dataset_name: str):
+    # Get accuracies and pass@k
+    if dataset_name == 'gsm8k':
+        answers = [int(x['answer']) for x in whole_dataset]
+        process_fn = lambda x: int(x)
+    elif dataset_name in ['kegg','shuffleobj']:
+        answers = [x['answer'].lower() for x in whole_dataset]
+        process_fn = lambda x: x
+    else:
+        raise ValueError(f'Unknown dataset: {dataset_name}')
+    assert len(answers) == len(all_responses)
+    accs, pass_at_k = [], []
+    for answer, responses in zip(answers, all_responses):
+        preds = np.array([
+            process_fn(extract_boxed_content(r)) for r in responses
+        ])
+        accs.append(np.mean(answer == preds))
+        pass_at_k.append(1 if answer in preds else 0)
+    return accs, pass_at_k
 
 def do_single_run(
     model_name,
@@ -259,13 +281,9 @@ def do_single_run(
         write_to_file(output_file, all_responses)
 
     # Get accuracies and pass@k
-    answers = [x['answer'].lower() for x in whole_dataset]
-    assert len(answers) == len(all_responses)
-    accs, pass_at_k = [], []
-    for answer, responses in zip(answers, all_responses):
-        preds = np.array([extract_boxed_content(r) for r in responses])
-        accs.append(np.mean(answer == preds))
-        pass_at_k.append(1 if answer in preds else 0)
+    accs, pass_at_k = calc_accuracy(whole_dataset=whole_dataset,
+                  all_responses=all_responses,
+                  dataset_name=dataset_name)
 
     if adapter_name is None:
         # Write scores to file (since pretrained)
