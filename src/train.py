@@ -34,7 +34,15 @@ def create_reward_func(dataset_name):
         return scores.astype(int)
     
     def gsm8k_reward_func(completions, answer, **kwargs):
-        predictions = np.array([int(extract_boxed_content(a)) for a in completions])
+        predictions = []
+        for a in completions:
+            try:
+                predictions.append(
+                    int(extract_boxed_content(a))
+                )
+            except:
+                predictions.append(None)
+        predictions = np.array(predictions)
         scores = np.array(answer) == predictions
         return scores.astype(int)
 
