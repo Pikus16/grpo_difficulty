@@ -153,7 +153,7 @@ def log_inference_results(results_path):
         raise ValueError(f'{results_path} not found')
     
     with open(results_path) as f:
-        results = json.load(results_path)
+        results = json.load(f)
     
     # Extract data from results dictionary
     checkpoint_numbers = results.get('checkpoint', [])
