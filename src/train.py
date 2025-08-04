@@ -7,6 +7,7 @@ import click
 import wandb
 import numpy as np
 import json
+import subprocess
 from src_utils import (
     CumulativeSuccessCallback,
     get_dataset_subset,
@@ -142,11 +143,17 @@ def setup_wandb(project, name, skip_train):
             name=name
         )
 
-def log_inference_results(results):
+def log_inference_results(results_path):
     """Log inference results to the active wandb run"""
     if wandb.run is None:
         print("Warning: No active wandb run found for logging inference results")
         return
+    
+    if not os.path.exists(results_path):
+        raise ValueError(f'{results_path} not found')
+    
+    with open(results_path) as f:
+        results = json.load(results_path)
     
     # Extract data from results dictionary
     checkpoint_numbers = results.get('checkpoint', [])
@@ -268,21 +275,14 @@ def main(
         torch.cuda.empty_cache()
 
     # Run inference
-    results =run_on_all_checkpoints(
-        model_name = model_name,
-        num_repeat=1, # hard coded to 1 for now
-        batch_size=32,
-        split ='test',
-        dataset_name=dataset_name,
-        run_name=name
-    )
+    cmd = f'python get_answers.py -m {model_name} --split test --dataset_name {dataset_name} -b 32 --num_repeat 1 --run_name {name}'
+    click.echo(f'Runnng command: {cmd}')
+    subprocess.run(cmd, shell=True)
 
     # Log inference results to the same wandb run
-    log_inference_results(results)
-    
-    # save inference info
-    with open(os.path.join(checkpoint_dir, 'test_results.json'), 'w') as f:
-        json.dump(results, f)
+    log_inference_results(
+        os.path.join(checkpoint_dir, 'test_results.json')
+    )
 
 if __name__ == '__main__':
     main()
