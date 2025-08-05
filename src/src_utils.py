@@ -285,6 +285,9 @@ def do_single_run(
     if output_file is not None:
         write_to_file(output_file, all_responses)
 
+    del model
+    torch.cuda.empty_cache()
+
     # Get accuracies and pass@k
     accs, pass_at_k = calc_accuracy(whole_dataset=whole_dataset,
                   all_responses=all_responses,
