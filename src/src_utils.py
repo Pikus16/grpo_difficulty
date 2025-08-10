@@ -116,7 +116,7 @@ def reformat_question(prompt: str, dataset_name: str):
         prompt = f"Solve the following genomic pathway question:\n{prompt}\n"
         prompt += f'Answer concisely, in 150 words or less. Put your final answer within \\boxed{{(disease name)}}, with no extra formatting'
     elif dataset_name == 'shuffleobj':
-        prompt = f"{prompt}.\nAnswer concisely, in 150 words or less. Put your final answer within \\boxed{{(X)}} (ex: \\boxed{{(A)}})"
+        prompt = f"{prompt}.\nAnswer very concisely, in 100 words or less. First think step-by-step. Then, at the very end, put your final answer within \\boxed{{(X)}} (ex: \\boxed{{(A)}})"
     elif dataset_name == 'gsm8k':
         prompt = f"{prompt}.\nPut your final answer within \\boxed{{}}."
     else:
