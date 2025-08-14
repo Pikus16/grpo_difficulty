@@ -13,72 +13,72 @@ from src_utils import _get_responses_dir, _get_dataset_dir, _get_checkpoint_dir,
 import argparse
 
 
-def do_single_run(
-    model_name,
-    adapter_name,
-    split,
-    dataset_name,
-    batch_size,
-    num_repeat
-):
-    # Load Model
-    model, tokenizer = build_test_model_and_tokenizer(model_name=model_name, adapter_name=adapter_name)
+# def do_single_run(
+#     model_name,
+#     adapter_name,
+#     split,
+#     dataset_name,
+#     batch_size,
+#     num_repeat
+# ):
+#     # Load Model
+#     model, tokenizer = build_test_model_and_tokenizer(model_name=model_name, adapter_name=adapter_name)
 
-    # Load Dataset
-    whole_dataset = load_whole_dataset(
-        dataset_name = dataset_name,
-        split = split,
-        model_name=model_name
-    )
-    whole_dataset = format_dataset_(whole_dataset, tokenizer, dataset_name)
+#     # Load Dataset
+#     whole_dataset = load_whole_dataset(
+#         dataset_name = dataset_name,
+#         split = split,
+#         model_name=model_name
+#     )
+#     whole_dataset = format_dataset_(whole_dataset, tokenizer, dataset_name)
 
-    # Load current responses
-    if adapter_name is not None:
-        output_dir = os.path.join(
-             _get_responses_dir(),
-             dataset_name,
-             '/'.join(adapter_name.split('/')[-2:])
-        )
-    else:
-        output_dir = os.path.join(
-            _get_dataset_dir(),
-            dataset_name,
-            model_name.replace('/','-')
-        )
+#     # Load current responses
+#     if adapter_name is not None:
+#         output_dir = os.path.join(
+#              _get_responses_dir(),
+#              dataset_name,
+#              '/'.join(adapter_name.split('/')[-2:])
+#         )
+#     else:
+#         output_dir = os.path.join(
+#             _get_dataset_dir(),
+#             dataset_name,
+#             model_name.replace('/','-')
+#         )
 
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    output_file = os.path.join(output_dir, f'{split}_responses.json')
-    all_responses = load_output_file(output_file)
+#     if not os.path.exists(output_dir):
+#         os.makedirs(output_dir)
+#     output_file = os.path.join(output_dir, f'{split}_responses.json')
+#     all_responses = load_output_file(output_file)
 
-    for i in tqdm(range(len(all_responses), len(whole_dataset), batch_size)):
-        batch = whole_dataset[i: i + batch_size]
-        questions = batch['prompt']
-        responses = sample_pass_at_k(model, tokenizer, questions, k=num_repeat)
-        all_responses.extend(responses)
-        if output_file is not None:
-            if i % (10 * batch_size) == 0:
-                #torch.cuda.empty_cache()
-                write_to_file(output_file, all_responses)
+#     for i in tqdm(range(len(all_responses), len(whole_dataset), batch_size)):
+#         batch = whole_dataset[i: i + batch_size]
+#         questions = batch['prompt']
+#         responses = sample_pass_at_k(model, tokenizer, questions, k=num_repeat)
+#         all_responses.extend(responses)
+#         if output_file is not None:
+#             if i % (10 * batch_size) == 0:
+#                 #torch.cuda.empty_cache()
+#                 write_to_file(output_file, all_responses)
 
-    if output_file is not None:
-        write_to_file(output_file, all_responses)
+#     if output_file is not None:
+#         write_to_file(output_file, all_responses)
 
-    del model
-    torch.cuda.empty_cache()
+#     del model
+#     torch.cuda.empty_cache()
 
-    # Get accuracies and pass@k
-    accs, pass_at_k = calc_accuracy(whole_dataset=whole_dataset,
-                  all_responses=all_responses,
-                  dataset_name=dataset_name)
+#     # Get accuracies and pass@k
+#     accs, pass_at_k = calc_accuracy(whole_dataset=whole_dataset,
+#                   all_responses=all_responses,
+#                   dataset_name=dataset_name)
 
-    if adapter_name is None:
-        # Write scores to file (since pretrained)
-        scores_file = os.path.join(output_dir, f'{split}_scores.json')
-        if not os.path.exists(scores_file):
-            print(f'Writing scores to {scores_file}')
-            write_to_file(scores_file, accs)
-    return np.mean(accs), np.mean(pass_at_k)
+#     if adapter_name is None:
+#         # Write scores to file (since pretrained)
+#         scores_file = os.path.join(output_dir, f'{split}_scores.json')
+#         if not os.path.exists(scores_file):
+#             print(f'Writing scores to {scores_file}')
+#             write_to_file(scores_file, accs)
+#     return np.mean(accs), np.mean(pass_at_k)
 
 
 # ------------------- AIME EVAL SUPPORT (HF-based, self-contained) -------------------
@@ -86,8 +86,6 @@ def do_single_run(
 def _auto_device():
     if torch.cuda.is_available():
         return 'cuda'
-    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-        return 'mps'
     return 'cpu'
 
 
@@ -106,8 +104,7 @@ def _load_aime_dataset_from_hf(config_name: str = "AIME2025-I", split: str | Non
 
 def _format_aime_prompt(question: str, tokenizer: AutoTokenizer) -> str:
     prompt = (
-        f"Solve the following AIME problem.\n\n{question}\n\n"
-        f"Think step-by-step. Then give only the final numeric answer. "
+        f"{question}.\n"
         f"Put your final answer within \\boxed{{}}."
     )
     return tokenizer.apply_chat_template(
@@ -207,7 +204,7 @@ def do_single_run_aime(
     for i in tqdm(range(len(all_responses), len(ds), batch_size)):
         batch = ds[i: i + batch_size]
         questions = batch['prompt']
-        responses = sample_pass_at_k(model, tokenizer, questions, k=num_repeat, device=device)
+        responses = sample_pass_at_k(model, tokenizer, questions, k=num_repeat, device=device, max_new_tokens=512)
         all_responses.extend(responses)
         if output_file is not None and i % (10 * batch_size) == 0:
             write_to_file(output_file, all_responses)

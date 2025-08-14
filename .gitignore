@@ -19,3 +19,9 @@ wandb
 
 # But do NOT ignore the root README.md
 !/README.md
+
+# Secret keys and credentials
+.ssh/
+**/credentials.json
+**/service-account*.json
+research-*.json
