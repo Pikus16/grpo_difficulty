@@ -20,13 +20,15 @@ import json
 @click.option('--batch_size', '-b', type=int, default=16, help='Batch size to use')
 @click.option('--num_repeat',  type=int, default=10, help='Number of answers per question')
 @click.option('--run_name',  type=str, default=None, help='Run name to load adapters')
+@click.option('--eval_last', is_flag=True, default=False, help="Only evaluate last checkpoint")
 def main(
     model_name: str,
     split: str,
     dataset_name: str,
     batch_size: int,
     num_repeat: int,
-    run_name: str
+    run_name: str,
+    eval_last: bool
 ):
     assert split in ['train','test']
 
@@ -36,7 +38,8 @@ def main(
         batch_size=batch_size,
         split=split,
         dataset_name=dataset_name,
-        run_name=run_name
+        run_name=run_name,
+        run_only_last=eval_last
     )
     if run_name is not None:
         # save inference info
