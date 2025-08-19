@@ -277,7 +277,9 @@ def main(
         torch.cuda.empty_cache()
 
     # Run inference
-    cmd = f'python get_answers.py -m {model_name} --split test --dataset_name {dataset_name} -b 32 --num_repeat 1 --run_name {name} --eval_last {eval_last}'
+    cmd = f'python get_answers.py -m {model_name} --split test --dataset_name {dataset_name} -b 32 --num_repeat 1 --run_name {name}'
+    if eval_last:
+        cmd += ' --eval_last'
     click.echo(f'Runnng command: {cmd}')
     subprocess.run(cmd, shell=True)
 
