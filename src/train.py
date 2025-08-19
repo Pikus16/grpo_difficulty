@@ -216,6 +216,7 @@ def log_inference_results(results_path):
               is_flag=True,
               help='Load model in 4-bit mode (flag)')
 @click.option('--skip_train', is_flag=True, default=False, help="Skip training and directly evaluate")
+@click.option('--eval_last', is_flag=True, default=False, help="Only evaluate last checkpoint")
 def main(
     dataset_name: str,
     strategy: str,
@@ -225,7 +226,8 @@ def main(
     model_name: str,
     max_steps: int,
     load_4bit: bool,
-    skip_train: bool
+    skip_train: bool,
+    eval_last: bool
 ):
     name = f'{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
     if strategy is not None and subset_perc is not None:
@@ -275,7 +277,7 @@ def main(
         torch.cuda.empty_cache()
 
     # Run inference
-    cmd = f'python get_answers.py -m {model_name} --split test --dataset_name {dataset_name} -b 32 --num_repeat 1 --run_name {name}'
+    cmd = f'python get_answers.py -m {model_name} --split test --dataset_name {dataset_name} -b 32 --num_repeat 1 --run_name {name} --eval_last {eval_last}'
     click.echo(f'Runnng command: {cmd}')
     subprocess.run(cmd, shell=True)
 

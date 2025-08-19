@@ -316,7 +316,8 @@ def run_on_all_checkpoints(
     batch_size: int,
     split: str,
     dataset_name: str,
-    run_name: str
+    run_name: str,
+    run_only_last: bool = False
 ):
     results = {}
     if dataset_name is not None and run_name is not None:
@@ -324,6 +325,8 @@ def run_on_all_checkpoints(
         assert os.path.exists(adapter_folder)
         all_adapters = glob(f'{adapter_folder}/checkpoint-*')
         checkpoint_numbers = sorted([int(os.path.basename(path).split('-')[1]) for path in all_adapters])
+        if run_only_last:
+            checkpoint_numbers = [checkpoint_numbers[-1]]
         print(f'Running on checkpoints: {checkpoint_numbers}')
 
         accuracies, passes = [], []
