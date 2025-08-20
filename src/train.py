@@ -88,7 +88,8 @@ def train(model,
           max_steps: int = 1000,
           checkpoint_dir: str = 'runs',
           save_steps: int = 100,
-          just_get_data_order: bool = True):
+          just_get_data_order: bool = True,
+          dataset_name: str = None):
     config = GRPOConfig(
         learning_rate=5e-6,
         adam_beta1=0.9,
@@ -129,7 +130,7 @@ def train(model,
             assert batch[0]['example_id'] == batch[-1]['example_id']
             ids_.append(batch[0]['example_id'])
 
-        path_ = os.path.join(_get_base_path(), 'misc', 'train_data_order', f'{run_name}.json')
+        path_ = os.path.join(_get_base_path(), 'misc', 'train_data_order', f'{dataset_name}_{run_name}.json')
         with open(path_,'w') as f:
             json.dump(ids_, f)
     else:
@@ -287,7 +288,8 @@ def main(
             max_steps=max_steps,
             checkpoint_dir=checkpoint_dir,
             reward_fn=create_reward_func(dataset_name),
-            just_get_data_order=just_get_order
+            just_get_data_order=just_get_order,
+            dataset_name=dataset_name
         )
         
         # clear up memory before inference
