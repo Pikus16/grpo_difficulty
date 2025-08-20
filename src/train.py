@@ -13,7 +13,7 @@ from src_utils import (
     get_dataset_subset,
     load_whole_dataset,
     extract_boxed_content,
-    _get_base_path,
+    _get_order_file,
     _get_checkpoint_dir,
     format_dataset_
 )
@@ -140,8 +140,7 @@ def train(model,
                 break
 
         assert len(ids_) == max_steps
-        path_ = os.path.join(_get_base_path(), 'misc', 'train_data_order', f'{dataset_name}_{run_name}.json')
-        with open(path_,'w') as f:
+        with open(_get_order_file(dataset_name),'w') as f:
             json.dump(ids_, f)
     else:
         trainer.train()
@@ -258,8 +257,10 @@ def main(
     just_get_order: bool
 ):
     name = f'{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
-    if strategy is not None and subset_perc is not None:
-        name += f'_strategy{strategy}_subsetperc{subset_perc}'
+    if strategy is not None:
+        name += f'_strategy{strategy}'
+    if subset_perc is not None:
+        name += f'_subsetperc{subset_perc}'
     
     if not just_get_order:
         setup_wandb(project=project, name=f'{dataset_name}_{name}', skip_train=skip_train)
@@ -273,8 +274,8 @@ def main(
             split='train',
             model_name=model_name
         )
-        if strategy is not None and subset_perc is not None:
-            click.echo(f'Loading {subset_perc} size subset with strategy {strategy}')
+        if strategy is not None:
+            click.echo(f'Loading {subset_perc} size')
             dataset = get_dataset_subset(
                 whole_dataset=dataset,
                 strategy = strategy,

@@ -27,6 +27,12 @@ def _get_checkpoint_dir(dataset_name: str, name: str):
         name
     )
 
+def _get_order_file(dataset_name: str):
+    return os.path.join(_get_base_path(), 'misc', 'train_data_order', f'{dataset_name}.json')
+
+def _get_train_set_perf_designation(dataset_name: str, model_name: str):
+    return os.path.join(_get_base_path(), 'misc', 'train_set_perf', dataset_name, f"{model_name.replace('/','-')}.json")
+
 def load_whole_dataset(dataset_name: str, split: str, model_name: str = None) -> HFDataset:
     dset_base_path =_get_dataset_dir()
     data_file = os.path.join(dset_base_path, dataset_name, f'{split}.json')
@@ -44,6 +50,12 @@ def load_whole_dataset(dataset_name: str, split: str, model_name: str = None) ->
                 scores = json.load(f)
             assert len(scores) == len(ds)
             ds = ds.add_column('pretrained_score', scores)
+    
+    # add categorization based on base and train perf
+    with open(_get_train_set_perf_designation(dataset_name=dataset_name, model_name=model_name)) as f:
+        perf_designation = json.load(f)
+        assert len(perf_designation) == len(ds)
+    ds.add_column('train_perf_cat', perf_designation)
     return ds
 
 def get_hardest_subset(whole_dataset: HFDataset, size: int) -> HFDataset:
@@ -77,6 +89,9 @@ def get_middle_subset(whole_dataset: HFDataset, size: int) -> HFDataset:
     start = max((total - size) // 2, 0)
     return sorted_ds.select(range(start, start + size))
 
+def get_base_wrong_train_right(whole_dataset: HFDataset, size: int) -> HFDataset:
+    return whole_dataset.filter(lambda x: x["train_perf_cat"] == "train_right_base_wrong")
+
 def get_dataset_subset(whole_dataset:HFDataset, strategy: str, size: float | int) -> HFDataset:
     if isinstance(size, float):
         assert size <= 1.0 and size >= 0.0
@@ -90,6 +105,8 @@ def get_dataset_subset(whole_dataset:HFDataset, strategy: str, size: float | int
         fn = get_middle_subset
     elif strategy == 'random':
         fn = get_random_subset
+    elif strategy == 'basewrongtrainright':
+        fn = get_base_wrong_train_right
     else:
         raise ValueError(f'Unknown strategy: {strategy}')
     
