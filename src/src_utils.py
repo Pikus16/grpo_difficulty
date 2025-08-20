@@ -96,7 +96,9 @@ def get_dataset_subset(whole_dataset:HFDataset, strategy: str, size: float | int
     if isinstance(size, float):
         assert size <= 1.0 and size >= 0.0
         size = int(len(whole_dataset) * size)
-    assert isinstance(size, int)
+    if size is not None:
+        # size can be none for some strategies
+        assert isinstance(size, int)
     if strategy == 'hardest':
         fn = get_hardest_subset
     elif strategy == 'easiest':
