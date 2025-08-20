@@ -13,7 +13,7 @@ from src_utils import (
     get_dataset_subset,
     load_whole_dataset,
     extract_boxed_content,
-    run_on_all_checkpoints,
+    _get_base_path,
     _get_checkpoint_dir,
     format_dataset_
 )
@@ -87,7 +87,8 @@ def train(model,
           batch_size: int = 4,
           max_steps: int = 1000,
           checkpoint_dir: str = 'runs',
-          save_steps: int = 100):
+          save_steps: int = 100,
+          just_get_data_order: bool = True):
     config = GRPOConfig(
         learning_rate=5e-6,
         adam_beta1=0.9,
@@ -108,6 +109,9 @@ def train(model,
         run_name=run_name,
         save_steps=save_steps
     )
+
+    if just_get_data_order:
+        dataset = dataset.add_column("example_id", list(range(len(dataset))))
     trainer = GRPOTrainer(
         model=model,
         processing_class=tokenizer,
@@ -118,9 +122,20 @@ def train(model,
         train_dataset=dataset,
         callbacks=[CumulativeSuccessCallback()],
     )
-    trainer.train()
-    
-    model.save_pretrained(f'{checkpoint_dir}/final')
+    if just_get_data_order:
+        ids_ = []
+        train_dataloader = trainer.get_train_dataloader()
+        for _, batch in enumerate(train_dataloader):
+            assert batch[0]['example_id'] == batch[-1]['example_id']
+            ids_.append(batch[0]['example_id'])
+
+        path_ = os.path.join(_get_base_path(), 'misc', 'train_data_order', f'{run_name}.json')
+        with open(path_,'w') as f:
+            json.dump(ids_, f)
+    else:
+        trainer.train()
+        
+        model.save_pretrained(f'{checkpoint_dir}/final')
 
 def setup_wandb(project, name, skip_train):
     if skip_train:
@@ -217,6 +232,7 @@ def log_inference_results(results_path):
               help='Load model in 4-bit mode (flag)')
 @click.option('--skip_train', is_flag=True, default=False, help="Skip training and directly evaluate")
 @click.option('--eval_last', is_flag=True, default=False, help="Only evaluate last checkpoint")
+@click.option('--just_get_order', is_flag=True, default=False, help="Only save the order of train data samples")
 def main(
     dataset_name: str,
     strategy: str,
@@ -227,7 +243,8 @@ def main(
     max_steps: int,
     load_4bit: bool,
     skip_train: bool,
-    eval_last: bool
+    eval_last: bool,
+    just_get_order: bool
 ):
     name = f'{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
     if strategy is not None and subset_perc is not None:
@@ -267,8 +284,9 @@ def main(
             num_generations=int(num_generations),
             max_steps=max_steps,
             checkpoint_dir=checkpoint_dir,
-            reward_fn=create_reward_func(dataset_name) 
-            )
+            reward_fn=create_reward_func(dataset_name),
+            just_get_data_order=just_get_order
+        )
         
         # clear up memory before inference
         model.to('cpu')
@@ -276,17 +294,18 @@ def main(
         del tokenizer
         torch.cuda.empty_cache()
 
-    # Run inference
-    cmd = f'python get_answers.py -m {model_name} --split test --dataset_name {dataset_name} -b 32 --num_repeat 1 --run_name {name}'
-    if eval_last:
-        cmd += ' --eval_last'
-    click.echo(f'Runnng command: {cmd}')
-    subprocess.run(cmd, shell=True)
+    if not just_get_order:
+        # Run inference
+        cmd = f'python get_answers.py -m {model_name} --split test --dataset_name {dataset_name} -b 32 --num_repeat 1 --run_name {name}'
+        if eval_last:
+            cmd += ' --eval_last'
+        click.echo(f'Runnng command: {cmd}')
+        subprocess.run(cmd, shell=True)
 
-    # Log inference results to the same wandb run
-    log_inference_results(
-        os.path.join(checkpoint_dir, 'test_results.json')
-    )
+        # Log inference results to the same wandb run
+        log_inference_results(
+            os.path.join(checkpoint_dir, 'test_results.json')
+        )
 
 if __name__ == '__main__':
     main()
