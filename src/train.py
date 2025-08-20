@@ -249,7 +249,9 @@ def main(
     name = f'{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
     if strategy is not None and subset_perc is not None:
         name += f'_strategy{strategy}_subsetperc{subset_perc}'
-    setup_wandb(project=project, name=f'{dataset_name}_{name}', skip_train=skip_train)
+    
+    if not just_get_order:
+        setup_wandb(project=project, name=f'{dataset_name}_{name}', skip_train=skip_train)
 
     checkpoint_dir = _get_checkpoint_dir(dataset_name, name)
     click.echo(f'Checkpoint directory: {checkpoint_dir}')
