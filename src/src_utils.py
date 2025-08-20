@@ -55,7 +55,7 @@ def load_whole_dataset(dataset_name: str, split: str, model_name: str = None) ->
     with open(_get_train_set_perf_designation(dataset_name=dataset_name, model_name=model_name)) as f:
         perf_designation = json.load(f)
         assert len(perf_designation) == len(ds)
-    ds.add_column('train_perf_cat', perf_designation)
+    ds = ds.add_column('train_perf_cat', perf_designation)
     return ds
 
 def get_hardest_subset(whole_dataset: HFDataset, size: int) -> HFDataset:
