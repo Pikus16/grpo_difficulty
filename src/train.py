@@ -124,12 +124,22 @@ def train(model,
         callbacks=[CumulativeSuccessCallback()],
     )
     if just_get_data_order:
-        ids_ = []
         train_dataloader = trainer.get_train_dataloader()
-        for _, batch in enumerate(train_dataloader):
-            assert batch[0]['example_id'] == batch[-1]['example_id']
-            ids_.append(batch[0]['example_id'])
+        sampler = train_dataloader.sampler  # usually RandomSampler
 
+        ids_ = []
+        step = 0
+        for _ in range(10000):  # big number, will break early
+            for batch in train_dataloader:
+                assert batch[0]['example_id'] == batch[-1]['example_id']
+                ids_.append(batch[0]['example_id'])
+                step += 1
+                if step >= config.max_steps:  # stop once you've simulated all steps
+                    break
+            if step >= config.max_steps:
+                break
+
+        assert len(ids_) == max_steps
         path_ = os.path.join(_get_base_path(), 'misc', 'train_data_order', f'{dataset_name}_{run_name}.json')
         with open(path_,'w') as f:
             json.dump(ids_, f)
