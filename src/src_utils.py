@@ -94,6 +94,9 @@ def get_middle_subset(whole_dataset: HFDataset, size: int) -> HFDataset:
 def get_base_wrong_train_right(whole_dataset: HFDataset, size: int) -> HFDataset:
     return whole_dataset.filter(lambda x: x["train_perf_cat"] == "train_right_base_wrong")
 
+def get_base_wrong(whole_dataset: HFDataset, size: int) -> HFDataset:
+    return whole_dataset.filter(lambda x: x["train_perf_cat"] in ["train_right_base_wrong", "train_wrong_base_wrong"])
+
 def get_dataset_subset(whole_dataset:HFDataset, strategy: str, size: float | int) -> HFDataset:
     if isinstance(size, float):
         assert size <= 1.0 and size >= 0.0
@@ -111,6 +114,8 @@ def get_dataset_subset(whole_dataset:HFDataset, strategy: str, size: float | int
         fn = get_random_subset
     elif strategy == 'basewrongtrainright':
         fn = get_base_wrong_train_right
+    elif strategy == 'basewrong':
+        fn = get_base_wrong
     else:
         raise ValueError(f'Unknown strategy: {strategy}')
     
