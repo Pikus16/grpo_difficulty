@@ -237,6 +237,10 @@ def log_inference_results(results_path):
               type=int,
               default=1000,
               help='Number of generations per iteration')
+@click.option('--save_steps',
+              type=int,
+              default=100,
+              help='How often to save')
 @click.option('--load_4bit', '-l',
               is_flag=True,
               help='Load model in 4-bit mode (flag)')
@@ -251,6 +255,7 @@ def main(
     num_generations: int,
     model_name: str,
     max_steps: int,
+    save_steps: int,
     load_4bit: bool,
     skip_train: bool,
     eval_last: bool,
@@ -297,6 +302,7 @@ def main(
             run_name=name,
             num_generations=int(num_generations),
             max_steps=max_steps,
+            save_steps=save_steps,
             checkpoint_dir=checkpoint_dir,
             reward_fn=create_reward_func(dataset_name),
             just_get_data_order=just_get_order,
