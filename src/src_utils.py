@@ -30,8 +30,8 @@ def _get_checkpoint_dir(dataset_name: str, name: str):
 def _get_order_file(dataset_name: str):
     return os.path.join(_get_base_path(), 'misc', 'train_data_order', f'{dataset_name}.json')
 
-def _get_train_set_perf_designation(dataset_name: str, model_name: str):
-    return os.path.join(_get_base_path(), 'misc', 'train_set_perf', dataset_name, f"{model_name.replace('/','-')}.json")
+def _get_train_set_perf_designation(dataset_name: str, model_name: str, split: str):
+    return os.path.join(_get_base_path(), 'misc', 'train_set_perf', dataset_name, f"{model_name.replace('/','-')}_{split}.json")
 
 def load_whole_dataset(dataset_name: str, split: str, model_name: str = None) -> HFDataset:
     dset_base_path =_get_dataset_dir()
@@ -52,7 +52,7 @@ def load_whole_dataset(dataset_name: str, split: str, model_name: str = None) ->
             ds = ds.add_column('pretrained_score', scores)
     
         # add categorization based on base and train perf
-        desig_file = _get_train_set_perf_designation(dataset_name=dataset_name, model_name=model_name)
+        desig_file = _get_train_set_perf_designation(dataset_name=dataset_name, model_name=model_name, split=split)
         if os.path.exists(desig_file):
             with open(desig_file) as f:
                 perf_designation = json.load(f)
