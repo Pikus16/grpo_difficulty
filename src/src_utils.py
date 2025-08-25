@@ -77,8 +77,17 @@ def get_easiest_subset(whole_dataset: HFDataset, size: int) -> HFDataset:
     sorted_ds = whole_dataset.sort("pretrained_score", reverse=True)
     return sorted_ds.select(range(size))
 
-def get_random_subset(whole_dataset: HFDataset, size: int, seed: int = 42) -> HFDataset:
-    return whole_dataset.shuffle(seed=seed).select(range(size))
+def get_random_subset(
+    whole_dataset: HFDataset,
+    size: int,
+    seed: int = 42,
+    return_indices: bool = False,
+):
+    shuffled = whole_dataset.shuffle(seed=seed)
+    indices = shuffled._indices[:size] if shuffled._indices is not None else list(range(size))
+
+    return indices if return_indices else shuffled.select(range(size))
+
 
 def get_middle_subset(whole_dataset: HFDataset, size: int) -> HFDataset:
     assert 'pretrained_score' in whole_dataset.column_names, \
@@ -97,9 +106,26 @@ def get_base_wrong_train_right(whole_dataset: HFDataset, size: int) -> HFDataset
 def get_base_wrong(whole_dataset: HFDataset, size: int) -> HFDataset:
     return whole_dataset.filter(lambda x: x["train_perf_cat"] in ["train_right_base_wrong", "train_wrong_base_wrong"])
 
-def get_random_base_wrong_train_right(whole_dataset: HFDataset, size: int) -> HFDataset:
+def get_random_base_wrong_train_right(
+    whole_dataset: HFDataset, 
+    size: int, 
+    return_indices: bool = False
+):
     size_to_use = len(get_base_wrong_train_right(whole_dataset, None))
-    return get_random_subset(whole_dataset, size_to_use)
+    return get_random_subset(whole_dataset, size_to_use, return_indices=return_indices)
+
+def get_single_hard(whole_dataset: HFDataset, size: int):
+    # Assuming your dataset is `ds`
+    subset = whole_dataset.filter(lambda x: x["pretrained_score"] > 0)
+
+    # Find index of smallest positive pretrained_score
+    min_idx = min(
+        range(len(subset)),
+        key=lambda i: subset[i]["pretrained_score"]
+    )
+
+    # Select that single example
+    return subset.select([min_idx])
 
 def get_dataset_subset(whole_dataset:HFDataset, strategy: str, size: float | int) -> HFDataset:
     if isinstance(size, float):
@@ -122,6 +148,8 @@ def get_dataset_subset(whole_dataset:HFDataset, strategy: str, size: float | int
         fn = get_base_wrong
     elif strategy == 'randombasewrongtrainright':
         fn = get_random_base_wrong_train_right
+    elif strategy == 'singlehard':
+        fn = get_single_hard
     else:
         raise ValueError(f'Unknown strategy: {strategy}')
     
