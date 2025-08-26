@@ -104,7 +104,9 @@ def get_base_wrong_train_right(whole_dataset: HFDataset, size: int) -> HFDataset
     return whole_dataset.filter(lambda x: x["train_perf_cat"] == "train_right_base_wrong")
 
 def get_not_base_wrong_train_right(whole_dataset: HFDataset, size: int) -> HFDataset:
-    return whole_dataset.filter(lambda x: x["train_perf_cat"] != "train_right_base_wrong")
+    return whole_dataset.filter(
+        lambda x: x["train_perf_cat"] not in {"train_right_base_wrong", "no_train_info"}
+    )
 
 def get_base_wrong(whole_dataset: HFDataset, size: int) -> HFDataset:
     return whole_dataset.filter(lambda x: x["train_perf_cat"] in ["train_right_base_wrong", "train_wrong_base_wrong"])
