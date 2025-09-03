@@ -49,6 +49,7 @@ def create_reward_func(dataset_name):
 
     def cruxo_reward_func(completions, answer, **kwargs):
         def _process_fn(x):
+            x = extract_boxed_content(x)
             try:
                 return eval(x)
             except:
