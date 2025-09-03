@@ -186,6 +186,8 @@ def reformat_question(prompt: str, dataset_name: str):
         prompt = f"{prompt}.\nAnswer very concisely, in 100 words or less. First think step-by-step. Then, at the very end, put your final answer within \\boxed{{(X)}} (ex: \\boxed{{(A)}})"
     elif dataset_name == 'gsm8k':
         prompt = f"{prompt}.\nPut your final answer within \\boxed{{}}."
+    elif dataset_name == 'cruxo':
+        prompt = f"{prompt}.\n\nPut your final answer within \\boxed{{}}. Answer in 100 words or less. When checking the answer, we will directly extract your boxed answer and do a python equals comparison against the ground truth."
     else:
         raise ValueError(f'Unknown dataset: {dataset_name}')
     return prompt
@@ -286,6 +288,16 @@ def calc_accuracy(whole_dataset: HFDataset,
     elif dataset_name in ['kegg','shuffleobj']:
         answers = [x['answer'].lower() for x in whole_dataset]
         process_fn = lambda x: x
+    elif dataset_name == 'cruxo':
+        answers = [eval(x) for x in whole_dataset['answer']]
+        def process_fn(x):
+            try:
+                return eval(x)
+            except:
+                try:
+                    return json.loads(x)
+                except:
+                    return None
     else:
         raise ValueError(f'Unknown dataset: {dataset_name}')
     assert len(answers) == len(all_responses)
