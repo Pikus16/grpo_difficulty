@@ -300,14 +300,19 @@ def calc_accuracy(whole_dataset: HFDataset,
                     return None
     else:
         raise ValueError(f'Unknown dataset: {dataset_name}')
+
     assert len(answers) == len(all_responses)
     accs, pass_at_k = [], []
     for answer, responses in zip(answers, all_responses):
-        preds = np.array([
+        preds = [
             process_fn(extract_boxed_content(r)) for r in responses
-        ])
-        accs.append(np.mean(answer == preds))
-        pass_at_k.append(1 if answer in preds else 0)
+        ]
+        correct_ = 0
+        for p in preds:
+            if p == answer:
+                correct_ += 1
+        accs.append(correct_ / len(preds))
+        pass_at_k.append(1 if correct_ > 0 else 0)
     return accs, pass_at_k
 
 def do_single_run(
