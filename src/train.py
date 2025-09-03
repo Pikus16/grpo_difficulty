@@ -47,6 +47,22 @@ def create_reward_func(dataset_name):
         scores = np.array(answer) == predictions
         return scores.astype(int)
 
+    def cruxo_reward_func(completions, answer, **kwargs):
+        def _process_fn(x):
+            try:
+                return eval(x)
+            except:
+                try:
+                    return json.loads(x)
+                except:
+                    return None
+
+        scores = []
+        for c, a in zip(completions, answer):
+            a = eval(a)
+            c = _process_fn(c)
+            scores.append(1 if c == a else 0)
+        return np.array(scores).astype(int)
 
     if dataset_name == 'kegg':
         return kegg_reward_func
@@ -54,6 +70,8 @@ def create_reward_func(dataset_name):
         return gsm8k_reward_func
     elif dataset_name == 'shuffleobj':
         return shuffle_correctness_reward_func
+    elif dataset_name == 'cruxo':
+        return cruxo_reward_func
     else:
         raise ValueError(f'Unknown dataset name {dataset_name}')
 
