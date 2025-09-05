@@ -108,6 +108,11 @@ def get_not_base_wrong_train_right(whole_dataset: HFDataset, size: int) -> HFDat
         lambda x: x["train_perf_cat"] not in {"train_right_base_wrong", "no_train_info"}
     )
 
+def get_not_base_wrong(whole_dataset: HFDataset, size: int) -> HFDataset:
+    return whole_dataset.filter(
+        lambda x: x["train_perf_cat"] not in {"train_right_base_wrong", "no_train_info",  "train_wrong_base_wrong"}
+    )
+
 def get_base_wrong(whole_dataset: HFDataset, size: int) -> HFDataset:
     return whole_dataset.filter(lambda x: x["train_perf_cat"] in ["train_right_base_wrong", "train_wrong_base_wrong"])
 
@@ -157,6 +162,8 @@ def get_dataset_subset(whole_dataset:HFDataset, strategy: str, size: float | int
         fn = get_single_hard
     elif strategy == 'notbasewrongtrainright':
         fn = get_not_base_wrong_train_right
+    elif strategy == 'notbasewrong':
+        fn = get_not_base_wrong
     else:
         raise ValueError(f'Unknown strategy: {strategy}')
     
