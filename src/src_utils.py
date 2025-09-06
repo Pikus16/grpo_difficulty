@@ -368,7 +368,7 @@ def do_single_run(
         responses = sample_pass_at_k(model, tokenizer, questions, k=num_repeat)
         all_responses.extend(responses)
         if output_file is not None:
-            if i % (10 * batch_size) == 0:
+            if i % 10 == 0:
                 #torch.cuda.empty_cache()
                 write_to_file(output_file, all_responses)
 
