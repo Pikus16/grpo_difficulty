@@ -195,6 +195,8 @@ def reformat_question(prompt: str, dataset_name: str):
         prompt = f"{prompt}.\nPut your final answer within \\boxed{{}}."
     elif dataset_name == 'cruxo':
         prompt = f"{prompt}.\n\nPut your final answer within \\boxed{{}}. Answer in 100 words or less. When checking the answer, we will directly extract your boxed answer and do a python equals comparison against the ground truth."
+    elif dataset_name == 'musique':
+        prompt = f"{prompt}.\n\nPut your final answer within \\boxed{{(ANSWER)}}. If the necessary information to answer the question is not in the context, answer with \\boxed{{CAN'T ANSWER}}."
     else:
         raise ValueError(f'Unknown dataset: {dataset_name}')
     return prompt
