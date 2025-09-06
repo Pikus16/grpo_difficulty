@@ -266,6 +266,10 @@ def log_inference_results(results_path):
 @click.option('--skip_train', is_flag=True, default=False, help="Skip training and directly evaluate")
 @click.option('--eval_last', is_flag=True, default=False, help="Only evaluate last checkpoint")
 @click.option('--just_get_order', is_flag=True, default=False, help="Only save the order of train data samples")
+@click.option('--test_batch_size',
+              type=int,
+              default=32,
+              help='Batch size to use during evaluation')
 def main(
     dataset_name: str,
     strategy: str,
@@ -278,7 +282,8 @@ def main(
     load_4bit: bool,
     skip_train: bool,
     eval_last: bool,
-    just_get_order: bool
+    just_get_order: bool,
+    test_batch_size: int
 ):
     name = f'{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
     if strategy is not None:
@@ -336,7 +341,7 @@ def main(
 
     if not just_get_order:
         # Run inference
-        cmd = f'python get_answers.py -m {model_name} --split test --dataset_name {dataset_name} -b 32 --num_repeat 1 --run_name {name}'
+        cmd = f'python get_answers.py -m {model_name} --split test --dataset_name {dataset_name} -b {test_batch_size} --num_repeat 1 --run_name {name}'
         if eval_last:
             cmd += ' --eval_last'
         click.echo(f'Runnng command: {cmd}')
