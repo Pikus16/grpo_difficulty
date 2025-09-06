@@ -65,6 +65,15 @@ def create_reward_func(dataset_name):
             scores.append(1 if c == a else 0)
         return np.array(scores).astype(int)
 
+    def musique_reward_func(completions, answer, **kwargs):
+        predictions = np.array([extract_boxed_content(a) for a in completions])
+        answer = np.array([a.lower() for a in answer])
+        scores = np.array([
+            a == p if p is not None else False
+            for a, p in zip(answer, predictions)
+        ])
+        return scores.astype(int)
+
     if dataset_name == 'kegg':
         return kegg_reward_func
     elif dataset_name == 'gsm8k':
@@ -73,6 +82,8 @@ def create_reward_func(dataset_name):
         return shuffle_correctness_reward_func
     elif dataset_name == 'cruxo':
         return cruxo_reward_func
+    elif dataset_name == 'musique':
+        return musique_reward_func
     else:
         raise ValueError(f'Unknown dataset name {dataset_name}')
 

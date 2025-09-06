@@ -292,7 +292,7 @@ def calc_accuracy(whole_dataset: HFDataset,
             except:
                 return None
             
-    elif dataset_name in ['kegg','shuffleobj']:
+    elif dataset_name in ['kegg','shuffleobj','musique']:
         answers = [x['answer'].lower() for x in whole_dataset]
         process_fn = lambda x: x
     elif dataset_name == 'cruxo':
