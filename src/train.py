@@ -119,7 +119,8 @@ def train(model,
           checkpoint_dir: str = 'runs',
           save_steps: int = 100,
           just_get_data_order: bool = True,
-          dataset_name: str = None):
+          dataset_name: str = None,
+          beta: float = 0.001):
     config = GRPOConfig(
         learning_rate=5e-6,
         adam_beta1=0.9,
@@ -138,7 +139,8 @@ def train(model,
         report_to="wandb",
         output_dir=checkpoint_dir,
         run_name=run_name,
-        save_steps=save_steps
+        save_steps=save_steps,
+        beta=beta
     )
 
     if just_get_data_order:
@@ -281,6 +283,10 @@ def log_inference_results(results_path):
               type=int,
               default=32,
               help='Batch size to use during evaluation')
+@click.option('--beta',
+              type=float,
+              default=0.001,
+              help='Beta Term for KL-Divergence')
 def main(
     dataset_name: str,
     strategy: str,
@@ -294,14 +300,15 @@ def main(
     skip_train: bool,
     eval_last: bool,
     just_get_order: bool,
-    test_batch_size: int
+    test_batch_size: int,
+    beta: float
 ):
-    name = f'{num_generations}gen_{max_steps}steps_{model_name}'.replace('/','-')
+    name = f'{num_generations}gen_{max_steps}steps_{model_name}_beta{beta}'.replace('/','-')
     if strategy is not None:
         name += f'_strategy{strategy}'
     if subset_perc is not None:
         name += f'_subsetperc{subset_perc}'
-    
+        
     if not just_get_order:
         setup_wandb(project=project, name=f'{dataset_name}_{name}', skip_train=skip_train)
 
@@ -341,7 +348,8 @@ def main(
             checkpoint_dir=checkpoint_dir,
             reward_fn=create_reward_func(dataset_name),
             just_get_data_order=just_get_order,
-            dataset_name=dataset_name
+            dataset_name=dataset_name,
+            beta=beta
         )
         
         # clear up memory before inference
