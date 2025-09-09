@@ -137,6 +137,13 @@ def get_single_hard(whole_dataset: HFDataset, size: int):
     # Select that single example
     return subset.select([min_idx])
 
+def get_random_single(whole_dataset: HFDataset, size: int, seed: int = 42):
+    random.seed(seed)
+    idx = random.randint(0, len(whole_dataset))
+    # Select that single example
+    return subset.select([idx])
+
+
 def get_dataset_subset(whole_dataset:HFDataset, strategy: str, size: float | int) -> HFDataset:
     if isinstance(size, float):
         assert size <= 1.0 and size >= 0.0
@@ -160,6 +167,8 @@ def get_dataset_subset(whole_dataset:HFDataset, strategy: str, size: float | int
         fn = get_random_base_wrong_train_right
     elif strategy == 'singlehard':
         fn = get_single_hard
+    elif strategy == 'singlerand':
+        fn = get_random_single
     elif strategy == 'notbasewrongtrainright':
         fn = get_not_base_wrong_train_right
     elif strategy == 'notbasewrong':
