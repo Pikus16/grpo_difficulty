@@ -283,6 +283,10 @@ def log_inference_results(results_path):
               type=int,
               default=32,
               help='Batch size to use during evaluation')
+@click.option('--test_num_repeat',
+              type=int,
+              default=1,
+              help='Number of times to sample during test')
 @click.option('--beta',
               type=float,
               default=0.001,
@@ -301,6 +305,7 @@ def main(
     eval_last: bool,
     just_get_order: bool,
     test_batch_size: int,
+    test_num_repeat: int,
     beta: float
 ):
     name = f'{num_generations}gen_{max_steps}steps_{model_name}_beta{beta}'.replace('/','-')
@@ -360,7 +365,7 @@ def main(
 
     if not just_get_order:
         # Run inference
-        cmd = f'python get_answers.py -m {model_name} --split test --dataset_name {dataset_name} -b {test_batch_size} --num_repeat 1 --run_name {name}'
+        cmd = f'python get_answers.py -m {model_name} --split test --dataset_name {dataset_name} -b {test_batch_size} --num_repeat {test_num_repeat} --run_name {name}'
         if eval_last:
             cmd += ' --eval_last'
         click.echo(f'Runnng command: {cmd}')
