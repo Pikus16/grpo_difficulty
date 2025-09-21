@@ -49,7 +49,7 @@ def create_reward_func(dataset_name, regression_reward: bool = False):
                 predictions.append(None)
         predictions = np.array(predictions)
         answer = np.array(answer)
-        if regression_reward: and all(scores == 0):
+        if regression_reward:
             scores = -np.abs(predictions - answer)
         else:
             scores = (answer == predictions)
@@ -329,6 +329,7 @@ def main(
     if subset_perc is not None:
         name += f'_subsetperc{subset_perc}'
     if regression_reward:
+        click.echo(f"Using regression reward")
         name += '_regressionreward'
         
     if not just_get_order:
