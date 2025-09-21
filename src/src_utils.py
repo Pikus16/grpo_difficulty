@@ -133,6 +133,15 @@ def get_random_base_wrong(
     size_to_use = len(get_base_wrong(whole_dataset, None))
     return get_random_subset(whole_dataset, size_to_use, return_indices=return_indices)
 
+def get_base_right_basewrongsize(
+    whole_dataset: HFDataset, 
+    size: int, 
+    return_indices: bool = False
+):
+    ds = get_not_base_wrong(whole_dataset, None)
+    size_to_use = len(get_base_wrong(whole_dataset, None))
+    return get_random_subset(ds, size_to_use, return_indices=return_indices)
+
 def get_single_hard(whole_dataset: HFDataset, size: int):
     # Assuming your dataset is `ds`
     subset = whole_dataset.filter(lambda x: x["pretrained_score"] > 0)
@@ -184,6 +193,8 @@ def get_dataset_subset(whole_dataset:HFDataset, strategy: str, size: float | int
         fn = get_not_base_wrong_train_right
     elif strategy == 'notbasewrong':
         fn = get_not_base_wrong
+    elif strategy == 'baserightsizebasewrong':
+        fn = get_base_right_basewrongsize
     else:
         raise ValueError(f'Unknown strategy: {strategy}')
     
