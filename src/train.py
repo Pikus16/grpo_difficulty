@@ -39,20 +39,21 @@ def create_reward_func(dataset_name, regression_reward: bool = False):
         return scores.astype(int)
     
     def gsm8k_reward_func(completions, answer, **kwargs):
-        predictions = []
-        for a in completions:
+        scores = []
+        for c,a in zip(completions, answer):
             try:
-                predictions.append(
-                    int(extract_boxed_content(a))
-                )
+                pred = int(extract_boxed_content(c))
+                if regression_reward:
+                    scores.append(
+                        -np.abs(pred - a)
+                    )
+                else:
+                    scores.append(
+                        pred == a
+                    )
             except:
-                predictions.append(None)
-        predictions = np.array(predictions)
-        answer = np.array(answer)
-        if regression_reward:
-            scores = -np.abs(predictions - answer)
-        else:
-            scores = (answer == predictions)
+                # Set to arbitrarily large negative number
+                scores.append(-1000000)
         return scores.astype(int)
 
     def cruxo_reward_func(completions, answer, **kwargs):
