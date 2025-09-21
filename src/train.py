@@ -18,11 +18,13 @@ from src_utils import (
     format_dataset_
 )
 
-def create_reward_func(dataset_name):
+def create_reward_func(dataset_name, regression_reward: bool = False):
     def shuffle_correctness_reward_func(completions, answer, **kwargs):
         predictions = np.array([extract_boxed_content(a) for a in completions])
         answer = np.array([a.lower() for a in answer])
         scores = answer == predictions
+        if regression_reward:
+            raise NotImplementedError()
         return scores.astype(int)
     
     def kegg_reward_func(completions, answer, **kwargs):
@@ -32,6 +34,8 @@ def create_reward_func(dataset_name):
             a in p if p is not None else False
             for a, p in zip(answer, predictions)
         ])
+        if regression_reward:
+            raise NotImplementedError()
         return scores.astype(int)
     
     def gsm8k_reward_func(completions, answer, **kwargs):
@@ -44,7 +48,11 @@ def create_reward_func(dataset_name):
             except:
                 predictions.append(None)
         predictions = np.array(predictions)
-        scores = np.array(answer) == predictions
+        answer = np.array(answer)
+        if regression_reward: and all(scores == 0):
+            scores = -np.abs(predictions - answer)
+        else:
+            scores = (answer == predictions)
         return scores.astype(int)
 
     def cruxo_reward_func(completions, answer, **kwargs):
@@ -63,6 +71,8 @@ def create_reward_func(dataset_name):
             a = eval(a)
             c = _process_fn(c)
             scores.append(1 if c == a else 0)
+        if regression_reward:
+            raise NotImplementedError()
         return np.array(scores).astype(int)
 
     def musique_reward_func(completions, answer, **kwargs):
@@ -72,6 +82,8 @@ def create_reward_func(dataset_name):
             a == p if p is not None else False
             for a, p in zip(answer, predictions)
         ])
+        if regression_reward:
+            raise NotImplementedError()
         return scores.astype(int)
 
     if dataset_name == 'kegg':
@@ -291,6 +303,8 @@ def log_inference_results(results_path):
               type=float,
               default=0.001,
               help='Beta Term for KL-Divergence')
+@click.option('--regression_reward', is_flag=True, default=False,
+    help="Modify the reward to be regression rather than 0/1")
 def main(
     dataset_name: str,
     strategy: str,
@@ -306,13 +320,16 @@ def main(
     just_get_order: bool,
     test_batch_size: int,
     test_num_repeat: int,
-    beta: float
+    beta: float,
+    regression_reward: bool,
 ):
     name = f'{num_generations}gen_{max_steps}steps_{model_name}_beta{beta}'.replace('/','-')
     if strategy is not None:
         name += f'_strategy{strategy}'
     if subset_perc is not None:
         name += f'_subsetperc{subset_perc}'
+    if regression_reward:
+        name += '_regressionreward'
         
     if not just_get_order:
         setup_wandb(project=project, name=f'{dataset_name}_{name}', skip_train=skip_train)
@@ -351,7 +368,7 @@ def main(
             max_steps=max_steps,
             save_steps=save_steps,
             checkpoint_dir=checkpoint_dir,
-            reward_fn=create_reward_func(dataset_name),
+            reward_fn=create_reward_func(dataset_name, regression_reward=regression_reward),
             just_get_data_order=just_get_order,
             dataset_name=dataset_name,
             beta=beta
