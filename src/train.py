@@ -57,7 +57,7 @@ def create_reward_func(dataset_name, regression_reward: bool = False):
                     scores.append(-1000000)
                 else:
                     scores.append(0)
-        return scores.astype(int)
+        return np.array(scores).astype(int)
 
     def cruxo_reward_func(completions, answer, **kwargs):
         def _process_fn(x):
