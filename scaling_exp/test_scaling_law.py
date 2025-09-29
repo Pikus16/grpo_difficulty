@@ -54,3 +54,46 @@ for i in range(5):
     pred = predictions[i]
     print(f"{row['model_size']:>10.0f}B | {row['base']:>8.3f} | {row['perc_learnable']:>10.3f} | "
           f"{pred:>15.3f} | {row['error']:>12.3f}")
+
+
+# -------------------------------------------------
+# Held-out test set evaluation
+# -------------------------------------------------
+try:
+    test_df = pd.read_csv('held_out_scaling_numbers.csv')
+    test_df = test_df[test_df['checkpoint'] == 1000].copy()
+    test_df['error'] = 1 - test_df['final_acc']
+
+    test_predictions = scaling_law(
+        test_df['model_size'].values,
+        test_df['base'].values,
+        test_df['perc_learnable'].values
+    )
+
+    test_r2 = r2_score(test_df['error'].values, test_predictions)
+
+    print("\nHeld-out Test Set Evaluation")
+    print("="*40)
+    print(f"Overall R² (test) = {test_r2:.4f}")
+
+    print("\nPer-dataset R² (test):")
+    for dataset in test_df['dataset'].unique():
+        mask = test_df['dataset'] == dataset
+        if mask.sum() > 0:
+            dataset_r2 = r2_score(
+                test_df.loc[mask, 'error'].values,
+                test_predictions[mask]
+            )
+            print(f"  {dataset}: {dataset_r2:.4f}")
+
+    print("\nExample predictions (test):")
+    print("Model Size | Base Acc | Perc Learn | Predicted Error | Actual Error")
+    print("-"*65)
+    for i in range(min(5, len(test_df))):
+        row = test_df.iloc[i]
+        pred = test_predictions[i]
+        print(f"{row['model_size']:>10.0f}B | {row['base']:>8.3f} | {row['perc_learnable']:>10.3f} | "
+              f"{pred:>15.3f} | {row['error']:>12.3f}")
+
+except FileNotFoundError:
+    print("\nNo held-out test set CSV found (expected 'scaling_analysis_test.csv'). Skipping test evaluation.")
