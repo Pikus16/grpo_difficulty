@@ -1,0 +1,2 @@
+timestamp,overall_ready,criteria_met,criteria_total,time_forward_r2_actual,held_out_r2_actual,slope_robustness_actual,calibration_slope_actual,pi_coverage_90_actual,decision_utility_actual,ablation_complete_actual,time_forward_r2_met,held_out_r2_met,slope_robustness_met,calibration_slope_met,pi_coverage_90_met,decision_utility_met,ablation_complete_met
+2025-10-09T16:25:23.972762,False,5,7,0.7654859648170831,0.807,0.007000000000000006,1.0418243285904192,0.6458333333333334,,True,True,True,True,True,False,False,True

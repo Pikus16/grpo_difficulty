@@ -1,0 +1,31 @@
+% Scaling Law Results Summary
+\begin{table}[h]
+\centering
+\caption{GRPO Curriculum Learning Scaling Law Performance}
+\begin{tabular}{lcc}
+\toprule
+Metric & Value & Target \\
+\midrule
+Training $R^2$ & 0.908 & $\geq 0.80$ \\
+Held-out $R^2$ & 0.807 & $\geq 0.75$ \\
+Checkpoint 200 $R^2$ & 0.752 & $\geq 0.70$ \\
+Checkpoint 100 $R^2$ & 0.533 & - \\
+Calibration slope & 0.95 & $0.9-1.1$ \\
+90\% PI coverage & 0.89 & $0.85-0.95$ \\
+Compute saved @ 3pp & 56\% & $\geq 50\%$ \\
+Winners missed @ 3pp & 2.8\% & $\leq 5\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% Final Model Equation
+\begin{equation}
+\text{logit}(e_1) = \text{logit}(e_0) - 0.532 - 0.399\log(M) - 0.286\text{logit}(L) + 147.4 S_{0:200} + \text{effects}
+\end{equation}
+
+% Where:
+% e_0 = 1 - base (initial error)
+% e_1 = final error
+% M = model size (billions of parameters)
+% L = percentage of learnable problems
+% S_{0:200} = early trajectory slope in logit space
