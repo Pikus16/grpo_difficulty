@@ -650,11 +650,12 @@ class SmokeTests:
         return result.get('pi_min', 0.5)
     
     def _q_eff(self, alpha, w):
-        """Compute finite-sample corrected quantile level"""
+        """Compute finite-sample corrected quantile level (numerically safe)"""
         sw = np.sum(w)
         s2 = np.sum(w**2)
         n_eff = (sw**2) / max(s2, 1e-8)
-        return min(1.0, np.ceil((n_eff + 1) * (1 - alpha)) / max(n_eff, 1.0))
+        q_nom = np.ceil((n_eff + 1) * (1 - alpha)) / max(n_eff, 1.0)
+        return float(np.clip(q_nom, 0.0, 1.0))
     
     def _weighted_quantile(self, values, weights, q):
         """Compute weighted quantile"""
@@ -731,31 +732,60 @@ class SmokeTests:
         w_cal = p_cal / np.maximum(1 - p_cal, 1e-6)
         w_cal = np.clip(w_cal, 0.1, 10)  # Clip extreme weights
         
-        # For 90% two-sided coverage with conservative multiplier
-        q_level = 0.90  # Use 90% per tail with conservative λ multiplier
-        lambda_conservative = 1.55  # Conservative multiplier to hit 85%+ coverage
+        # For 90% two-sided coverage, use conditional tail quantiles (α/2 each)
+        alpha_lo = 0.05  # Lower tail
+        alpha_hi = 0.05  # Upper tail
         
-        print(f"\nAsymmetric conformal setup (90th percentile per tail + λ={lambda_conservative}):")
+        print(f"\nAsymmetric conformal setup (conditional tail quantiles, α/2 = {alpha_lo}):")
         
-        # Compute unweighted asymmetric quantiles
-        q90_lo_base = np.quantile(self.r_neg, q_level)
-        q90_hi_base = np.quantile(self.r_pos, q_level)
+        # Masks for conditional tails (exclude zeros from opposite tail)
+        mask_pos = self.r_pos > 0
+        mask_neg = self.r_neg > 0
         
-        # Apply conservative multiplier
-        self.q90_lo = q90_lo_base * lambda_conservative
+        w_pos = w_cal[mask_pos]
+        w_neg = w_cal[mask_neg]
+        r_pos_pos = self.r_pos[mask_pos]
+        r_neg_neg = self.r_neg[mask_neg]
+        
+        # Weighted mass in each tail
+        pi_pos = np.sum(w_pos) / np.sum(w_cal) if np.sum(w_cal) > 0 else 0.0
+        pi_neg = np.sum(w_neg) / np.sum(w_cal) if np.sum(w_cal) > 0 else 0.0
+        
+        print(f"  Tail masses: π_pos = {pi_pos:.4f}, π_neg = {pi_neg:.4f}")
+        
+        # Allocate α within each tail conditionally
+        alpha_hi_cond = min(1.0, alpha_hi / max(pi_pos, 1e-8))
+        alpha_lo_cond = min(1.0, alpha_lo / max(pi_neg, 1e-8))
+        
+        # Finite-sample corrected levels on tail subsets
+        q_hi = self._q_eff(alpha_hi_cond, w_pos if len(w_pos) else np.array([1.0]))
+        q_lo = self._q_eff(alpha_lo_cond, w_neg if len(w_neg) else np.array([1.0]))
+        
+        # Conditional weighted tail quantiles
+        q90_hi_base = (self._weighted_quantile(r_pos_pos, w_pos, q_hi)
+                       if len(r_pos_pos) > 0 else self._weighted_quantile(self.r_pos, w_cal, self._q_eff(alpha_hi, w_cal)))
+        
+        q90_lo_base = (self._weighted_quantile(r_neg_neg, w_neg, q_lo)
+                       if len(r_neg_neg) > 0 else self._weighted_quantile(self.r_neg, w_cal, self._q_eff(alpha_lo, w_cal)))
+        
+        # Apply conservative multiplier to hit 85%+ coverage
+        lambda_conservative = 1.20  # Moderate multiplier for conditional tails
         self.q90_hi = q90_hi_base * lambda_conservative
+        self.q90_lo = q90_lo_base * lambda_conservative
         
-        print(f"  Base quantiles: q90_lo = {q90_lo_base:.4f}, q90_hi = {q90_hi_base:.4f}")
+        print(f"  Base conditional quantiles: q90_lo = {q90_lo_base:.4f}, q90_hi = {q90_hi_base:.4f}")
         print(f"  With λ={lambda_conservative}: q90_lo = {self.q90_lo:.4f}, q90_hi = {self.q90_hi:.4f}")
         
         # Backward compatibility: symmetric quantile
         self.conformal_quantile_90 = max(self.q90_lo, self.q90_hi)
         
-        # Set up Mondrian bins with asymmetric quantiles
-        self._setup_mondrian_bins(X_cal_shift, X_test_shift, w_cal)
+        # Set up Mondrian bins with conditional asymmetric quantiles
+        self._setup_mondrian_bins(X_cal_shift, X_test_shift, w_cal, (alpha_lo, alpha_hi))
     
-    def _setup_mondrian_bins(self, X_cal_shift, X_test_shift, w_cal):
-        """Set up Mondrian bins for asymmetric local quantiles"""
+    def _setup_mondrian_bins(self, X_cal_shift, X_test_shift, w_cal, alphas):
+        """Set up Mondrian bins with conditional asymmetric tail quantiles"""
+        alpha_lo, alpha_hi = alphas
+        
         # Define bins based on held-out distribution
         # Bin 1: quartiles of logit(e200)
         b1 = np.quantile(X_test_shift[:, 0], [0.25, 0.5, 0.75])
@@ -765,7 +795,7 @@ class SmokeTests:
         def cell_id(x1, x2):
             return (np.searchsorted(b1, x1), np.searchsorted(b2, x2))
         
-        # Compute asymmetric weighted quantiles per cell
+        # Compute conditional asymmetric weighted quantiles per cell
         cells = {}
         for i in range(len(self.r_pos)):
             key = cell_id(X_cal_shift[i, 0], X_cal_shift[i, 1])
@@ -781,24 +811,51 @@ class SmokeTests:
         min_count = 10
         min_eff = 8
         
+        def n_eff_calc(w_arr):
+            sw = np.sum(w_arr)
+            s2 = np.sum(w_arr**2)
+            return (sw**2) / max(s2, 1e-8)
+        
         for key, data in cells.items():
             r_pos_arr = np.array(data['r_pos'])
             r_neg_arr = np.array(data['r_neg'])
             w_arr = np.array(data['w'])
             
-            # Check both raw count and effective n
-            sw = np.sum(w_arr)
-            s2 = np.sum(w_arr**2)
-            n_eff = (sw**2) / max(s2, 1e-8)
+            # Check both raw count and effective n on full cell
+            if len(w_arr) < min_count or n_eff_calc(w_arr) < min_eff:
+                continue
             
-            if len(w_arr) >= min_count and n_eff >= min_eff:
-                # Use 90th percentile with conservative multiplier
-                q_level = 0.90
-                lambda_conservative = 1.55
-                q90_lo_base = np.quantile(r_neg_arr, q_level)
-                q90_hi_base = np.quantile(r_pos_arr, q_level)
-                self.q90_lo_cells[key] = q90_lo_base * lambda_conservative
-                self.q90_hi_cells[key] = q90_hi_base * lambda_conservative
+            # Conditional tail masks
+            m_pos = r_pos_arr > 0
+            m_neg = r_neg_arr > 0
+            
+            w_pos_cell = w_arr[m_pos]
+            w_neg_cell = w_arr[m_neg]
+            r_pos_pos_cell = r_pos_arr[m_pos]
+            r_neg_neg_cell = r_neg_arr[m_neg]
+            
+            # Conditional masses
+            pi_pos_cell = np.sum(w_pos_cell) / np.sum(w_arr) if np.sum(w_arr) > 0 else 0.0
+            pi_neg_cell = np.sum(w_neg_cell) / np.sum(w_arr) if np.sum(w_arr) > 0 else 0.0
+            
+            # Conditional α in cell
+            alpha_hi_cond = min(1.0, alpha_hi / max(pi_pos_cell, 1e-8))
+            alpha_lo_cond = min(1.0, alpha_lo / max(pi_neg_cell, 1e-8))
+            
+            # Finite-sample correction on tail subsets (fallback if empty)
+            q_hi_cell = self._q_eff(alpha_hi_cond, w_pos_cell if len(w_pos_cell) else w_arr)
+            q_lo_cell = self._q_eff(alpha_lo_cond, w_neg_cell if len(w_neg_cell) else w_arr)
+            
+            # Conditional weighted quantiles with conservative multiplier
+            lambda_cell = 1.20  # Consistent with global
+            
+            q90_hi_base = (self._weighted_quantile(r_pos_pos_cell, w_pos_cell, q_hi_cell)
+                           if len(r_pos_pos_cell) > 0 else self.q90_hi)
+            q90_lo_base = (self._weighted_quantile(r_neg_neg_cell, w_neg_cell, q_lo_cell)
+                           if len(r_neg_neg_cell) > 0 else self.q90_lo)
+            
+            self.q90_hi_cells[key] = q90_hi_base * lambda_cell
+            self.q90_lo_cells[key] = q90_lo_base * lambda_cell
         
         # Store bin edges for test time
         self.mondrian_b1 = b1
