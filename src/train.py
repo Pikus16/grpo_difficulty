@@ -17,6 +17,17 @@ from src_utils import (
     _get_checkpoint_dir,
     format_dataset_
 )
+from transformers import TrainerCallback
+
+class EarlyStoppingAtStepCallback(TrainerCallback):
+    """Callback to stop training at a specific step."""
+    def __init__(self, stop_at_step: int):
+        self.stop_at_step = stop_at_step
+    
+    def on_step_end(self, args, state, control, **kwargs):
+        if state.global_step >= self.stop_at_step:
+            control.should_training_stop = True
+        return control
 
 def create_reward_func(dataset_name, regression_reward: bool = False):
     def shuffle_correctness_reward_func(completions, answer, **kwargs):
@@ -165,6 +176,13 @@ def train(model,
 
     if just_get_data_order:
         dataset = dataset.add_column("example_id", list(range(len(dataset))))
+    
+    # Prepare callbacks
+    callbacks = [CumulativeSuccessCallback()]
+    if lr_schedule_steps is not None and lr_schedule_steps != max_steps:
+        # Add callback to stop training at max_steps while scheduler runs for lr_schedule_steps
+        callbacks.append(EarlyStoppingAtStepCallback(stop_at_step=max_steps))
+    
     trainer = GRPOTrainer(
         model=model,
         processing_class=tokenizer,
@@ -173,7 +191,7 @@ def train(model,
         ],
         args=config,
         train_dataset=dataset,
-        callbacks=[CumulativeSuccessCallback()],
+        callbacks=callbacks,
     )
     if just_get_data_order:
         train_dataloader = trainer.get_train_dataloader()
@@ -195,16 +213,8 @@ def train(model,
         with open(_get_order_file(dataset_name),'w') as f:
             json.dump(ids_, f)
     else:
-        # If we're using a different scheduler_steps, manually stop training at max_steps
-        if lr_schedule_steps is not None and lr_schedule_steps != max_steps:
-            # Override the max_steps in trainer to stop early
-            original_max_steps = trainer.args.max_steps
-            trainer.args.max_steps = max_steps
-            trainer.train()
-            trainer.args.max_steps = original_max_steps  # restore for consistency
-        else:
-            trainer.train()
-        
+        # Train with callback handling early stopping if needed
+        trainer.train()
         model.save_pretrained(f'{checkpoint_dir}/final')
 
 def setup_wandb(project, name, skip_train):
