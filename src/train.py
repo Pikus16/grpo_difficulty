@@ -136,7 +136,11 @@ def train(model,
           save_steps: int = 100,
           just_get_data_order: bool = True,
           dataset_name: str = None,
-          beta: float = 0.001):
+          beta: float = 0.001,
+          lr_schedule_steps: int = None):
+    # Use lr_schedule_steps for LR scheduler if provided, otherwise use max_steps
+    scheduler_steps = lr_schedule_steps if lr_schedule_steps is not None else max_steps
+    
     config = GRPOConfig(
         learning_rate=5e-6,
         adam_beta1=0.9,
@@ -150,7 +154,7 @@ def train(model,
         gradient_accumulation_steps=1,
         num_generations=num_generations,
         max_completion_length=max_completion_length,
-        max_steps=max_steps,
+        max_steps=scheduler_steps,  # Set to scheduler_steps for LR schedule calculation
         max_grad_norm=0.1,
         report_to="wandb",
         output_dir=checkpoint_dir,
@@ -182,16 +186,24 @@ def train(model,
                 assert batch[0]['example_id'] == batch[-1]['example_id']
                 ids_.append(batch[0]['example_id'])
                 step += 1
-                if step >= config.max_steps:  # stop once you've simulated all steps
+                if step >= max_steps:  # stop once you've simulated all steps
                     break
-            if step >= config.max_steps:
+            if step >= max_steps:
                 break
 
         assert len(ids_) == max_steps
         with open(_get_order_file(dataset_name),'w') as f:
             json.dump(ids_, f)
     else:
-        trainer.train()
+        # If we're using a different scheduler_steps, manually stop training at max_steps
+        if lr_schedule_steps is not None and lr_schedule_steps != max_steps:
+            # Override the max_steps in trainer to stop early
+            original_max_steps = trainer.args.max_steps
+            trainer.args.max_steps = max_steps
+            trainer.train()
+            trainer.args.max_steps = original_max_steps  # restore for consistency
+        else:
+            trainer.train()
         
         model.save_pretrained(f'{checkpoint_dir}/final')
 
@@ -309,6 +321,8 @@ def log_inference_results(results_path):
               help='Beta Term for KL-Divergence')
 @click.option('--regression_reward', is_flag=True, default=False,
     help="Modify the reward to be regression rather than 0/1")
+@click.option('--quick_test', is_flag=True, default=False,
+    help="Quick test mode: train for 50 steps with checkpoints at 25 and 50, but use LR schedule for 1000 steps")
 def main(
     dataset_name: str,
     strategy: str,
@@ -326,7 +340,16 @@ def main(
     test_num_repeat: int,
     beta: float,
     regression_reward: bool,
+    quick_test: bool,
 ):
+    # Override settings for quick test mode
+    lr_schedule_steps = None
+    if quick_test:
+        click.echo("Quick test mode: training for 50 steps with LR schedule for 1000 steps")
+        lr_schedule_steps = 1000
+        max_steps = 50
+        save_steps = 25
+    
     name = f'{num_generations}gen_{max_steps}steps_{model_name}_beta{beta}'.replace('/','-')
     if strategy is not None:
         name += f'_strategy{strategy}'
@@ -335,6 +358,8 @@ def main(
     if regression_reward:
         click.echo(f"Using regression reward")
         name += '_regressionreward'
+    if quick_test:
+        name += '_quicktest'
         
     if not just_get_order:
         setup_wandb(project=project, name=f'{dataset_name}_{name}', skip_train=skip_train)
@@ -376,7 +401,8 @@ def main(
             reward_fn=create_reward_func(dataset_name, regression_reward=regression_reward),
             just_get_data_order=just_get_order,
             dataset_name=dataset_name,
-            beta=beta
+            beta=beta,
+            lr_schedule_steps=lr_schedule_steps
         )
         
         # clear up memory before inference
