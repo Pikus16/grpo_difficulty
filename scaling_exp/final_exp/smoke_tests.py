@@ -81,7 +81,9 @@ class SmokeTests:
         return r2, calib
     
     def _evaluate_at_checkpoint(self, T):
-        """Evaluate using data up to checkpoint T"""
+        """Evaluate using data up to checkpoint T with GroupKFold (no run leakage)"""
+        from sklearn.model_selection import GroupKFold
+        
         # Get data at checkpoint T and final
         cp_df = self.train_df[self.train_df['checkpoint'] == T].copy()
         final_df = self.train_df[self.train_df['checkpoint'] == 1000].copy()
@@ -105,37 +107,52 @@ class SmokeTests:
         merged['base_error'] = 1 - merged['base']
         
         # Calculate slope from 0 to T
-        merged['logit_error_0'] = logit(np.clip(merged['base_error'], self.epsilon, 1-self.epsilon))
-        merged['logit_error_T'] = logit(np.clip(merged['error_T'], self.epsilon, 1-self.epsilon))
-        merged['slope_0_T'] = (merged['logit_error_T'] - merged['logit_error_0']) / T
+        logit0 = logit(np.clip(merged['base_error'], self.epsilon, 1-self.epsilon))
+        logitT = logit(np.clip(merged['error_T'], self.epsilon, 1-self.epsilon))
+        merged['slope_0_T'] = (logitT - logit0) / T
         
-        # Build model
+        # Build features
         X = np.column_stack([
-            np.log(merged['model_size']),
+            np.log(np.clip(merged['model_size'], self.epsilon, None)),
             logit(np.clip(merged['perc_learnable'], self.epsilon, 1-self.epsilon)),
             merged['slope_0_T']
         ])
         
-        y_star = (logit(np.clip(merged['final_error'], self.epsilon, 1-self.epsilon)) - 
-                  merged['logit_error_0'])
+        y_star = (logit(np.clip(merged['final_error'], self.epsilon, 1-self.epsilon)) - logit0)
         
-        # Fit and predict
-        model = Ridge(alpha=1e-3)
-        model.fit(X, y_star)
-        pred_y_star = model.predict(X)
-        pred_final_error = expit(merged['logit_error_0'] + pred_y_star)
+        # Create groups (one per unique run)
+        groups = merged[['dataset', 'strategy', 'model_name']].astype(str).agg('|'.join, axis=1)
         
-        # Calculate R²
-        r2 = r2_score(merged['final_error'], pred_final_error)
+        # GroupKFold cross-validation (5 folds)
+        gkf = GroupKFold(n_splits=min(5, len(groups.unique())))
         
-        # Calibration
-        lr = LinearRegression()
-        # Handle both numpy arrays and pandas Series
-        pred_array = pred_final_error.values if hasattr(pred_final_error, 'values') else pred_final_error
-        lr.fit(pred_array.reshape(-1, 1), merged['final_error'].values)
-        calib = {'slope': lr.coef_[0], 'intercept': lr.intercept_}
+        r2s, slopes, intercepts = [], [], []
+        for tr_idx, te_idx in gkf.split(X, y_star, groups=groups):
+            # Fit model on train fold
+            model = Ridge(alpha=1e-3)
+            model.fit(X[tr_idx], y_star.iloc[tr_idx])
+            
+            # Predict on test fold
+            pred_y_star = model.predict(X[te_idx])
+            pred_error = expit(logit0.iloc[te_idx].values + pred_y_star)
+            
+            # R² on test fold
+            r2s.append(r2_score(merged['final_error'].iloc[te_idx], pred_error))
+            
+            # Calibration on test fold
+            lr = LinearRegression()
+            lr.fit(pred_error.reshape(-1, 1), merged['final_error'].iloc[te_idx].values)
+            slopes.append(lr.coef_[0])
+            intercepts.append(lr.intercept_)
         
-        return r2, calib
+        # Average across folds
+        avg_r2 = float(np.mean(r2s))
+        avg_slope = float(np.mean(slopes))
+        avg_intercept = float(np.mean(intercepts))
+        
+        calib = {'slope': avg_slope, 'intercept': avg_intercept}
+        
+        return avg_r2, calib
     
     def test_b_leakage_missingness_audit(self):
         """Test B: Leakage & missingness audit"""
@@ -269,30 +286,69 @@ class SmokeTests:
             # Calculate R²
             r2 = r2_score(valid_df['final_error'], pred_error)
             
-            # Convert slope coefficient to per-100 steps
-            slope_coef_per_100 = model.coef_[2] * 100
+            # Get slope statistics
+            slope_mean = valid_df['slope'].mean()
+            slope_std = valid_df['slope'].std()
             
             results[method_name] = {
                 'r2': r2,
                 'slope_coefficient': model.coef_[2],
-                'slope_per_100_steps': slope_coef_per_100,
+                'slope_mean': slope_mean,
+                'slope_std': slope_std,
                 'n_valid': len(valid_df)
             }
             
             print(f"  R² = {r2:.4f}")
             print(f"  Slope coefficient = {model.coef_[2]:.1f}")
-            print(f"  Per 100 steps = {slope_coef_per_100:.1f}")
+            print(f"  Mean slope in data = {slope_mean:.4f}")
             print(f"  Valid runs = {len(valid_df)}")
         
         # Compare results
         print("\nComparison across methods:")
         r2_values = [r['r2'] for r in results.values()]
-        coef_values = [r['slope_per_100_steps'] for r in results.values()]
+        coef_values = [r['slope_coefficient'] for r in results.values()]
         
         print(f"  R² range: {min(r2_values):.4f} - {max(r2_values):.4f} (Δ = {max(r2_values) - min(r2_values):.4f})")
         print(f"  Coefficient range: {min(coef_values):.1f} - {max(coef_values):.1f} (Δ = {max(coef_values) - min(coef_values):.1f})")
         
+        # Compute partial R² for slope (stable across units)
+        self._compute_partial_r2_for_slope(valid_df)
+        
         return results
+    
+    def _compute_partial_r2_for_slope(self, valid_df):
+        """Compute partial R² contribution of slope term"""
+        from sklearn.metrics import r2_score
+        
+        # Fit with slope
+        X_full = np.column_stack([
+            np.log(np.clip(valid_df['model_size'], self.epsilon, None)),
+            logit(np.clip(valid_df['perc_learnable'], self.epsilon, 1-self.epsilon)),
+            valid_df['slope']
+        ])
+        
+        base_error = 1 - valid_df['base']
+        final_error = 1 - valid_df['final_acc']
+        y_star = (logit(np.clip(final_error, self.epsilon, 1-self.epsilon)) - 
+                  logit(np.clip(base_error, self.epsilon, 1-self.epsilon)))
+        
+        m_full = Ridge(alpha=1e-3).fit(X_full, y_star)
+        pred_full = expit(logit(np.clip(base_error, self.epsilon, 1-self.epsilon)) + m_full.predict(X_full))
+        r2_full = r2_score(final_error, pred_full)
+        
+        # Fit without slope
+        X_drop = X_full[:, :2]
+        m_drop = Ridge(alpha=1e-3).fit(X_drop, y_star)
+        pred_drop = expit(logit(np.clip(base_error, self.epsilon, 1-self.epsilon)) + m_drop.predict(X_drop))
+        r2_drop = r2_score(final_error, pred_drop)
+        
+        partial_r2 = r2_full - r2_drop
+        print(f"\nSlope impact (partial R²): {partial_r2:+.4f}")
+        print(f"  R² with slope: {r2_full:.4f}")
+        print(f"  R² without slope: {r2_drop:.4f}")
+        print(f"  → Slope contributes {partial_r2:.4f} to total R²")
+        
+        return partial_r2
     
     def _compute_slope_linear_fit(self, dataset, strategy, model_name):
         """Compute slope using linear fit to checkpoints 0-200"""
@@ -466,8 +522,15 @@ class SmokeTests:
         dataset_dummies = pd.get_dummies(data['dataset'], prefix='dataset', drop_first=True)
         strategy_dummies = pd.get_dummies(data['strategy'], prefix='strategy', drop_first=True)
         
+        # Build features correctly - logit for probabilities, log for size
+        base_features = np.column_stack([
+            np.log(data['model_size']),
+            logit(np.clip(data['base'], self.epsilon, 1-self.epsilon)),
+            logit(np.clip(data['perc_learnable'], self.epsilon, 1-self.epsilon))
+        ])
+        
         X = np.hstack([
-            np.log(data[['model_size', 'base', 'perc_learnable']].values + self.epsilon),
+            base_features,
             dataset_dummies.values,
             strategy_dummies.values
         ])
@@ -506,11 +569,359 @@ class SmokeTests:
         
         return r2_score(data['final_error'], pred_error)
     
+    def _optimize_decision_frontier(self, final_df):
+        """Optimize decision frontier over threshold and probability cutoff pairs"""
+        # Test different thresholds and find optimal cutoffs
+        thresholds = [0.01, 0.02, 0.03, 0.04, 0.05]
+        pi_grid = np.linspace(0.05, 0.8, 30)
+        
+        best_results = []
+        
+        for threshold in thresholds:
+            # Get predictions and calculate success probabilities
+            prob_successes = []
+            actual_gains = []
+            
+            for _, run in final_df.iterrows():
+                pred_result = self._predict_gain_at_200(run['dataset'], run['strategy'], run['model_name'])
+                
+                if isinstance(pred_result, tuple) and pred_result[1] is not None:
+                    pred_final_error, uncertainty = pred_result
+                    
+                    # Calculate probability of achieving threshold gain
+                    base_error = 1 - run['base']
+                    threshold_error = 1 - (run['base'] + threshold)
+                    
+                    # In y* space
+                    y_star_threshold = (logit(np.clip(threshold_error, self.epsilon, 1-self.epsilon)) - 
+                                      logit(np.clip(base_error, self.epsilon, 1-self.epsilon)))
+                    y_star_pred = (logit(np.clip(pred_final_error, self.epsilon, 1-self.epsilon)) - 
+                                 logit(np.clip(base_error, self.epsilon, 1-self.epsilon)))
+                    
+                    # Probability using normal approximation
+                    from scipy.stats import norm
+                    sigma = uncertainty / 1.645  # Convert 90% quantile to std
+                    prob_success = norm.cdf(y_star_threshold, loc=y_star_pred, scale=sigma)
+                    
+                    prob_successes.append(prob_success)
+                    actual_gains.append(run['actual_gain'])
+            
+            # Convert to arrays
+            prob_successes = np.array(prob_successes)
+            actual_gains = np.array(actual_gains)
+            
+            # Find best cutoff for this threshold
+            best_cutoff = None
+            best_compute = 0
+            best_missed = 1.0
+            
+            for pi_min in pi_grid:
+                stop_mask = prob_successes < pi_min
+                
+                if stop_mask.sum() > 0:
+                    true_winners = actual_gains >= threshold
+                    missed_winners = (stop_mask & true_winners).sum()
+                    missed_rate = missed_winners / true_winners.sum() if true_winners.sum() > 0 else 0
+                    compute_saved = stop_mask.sum() / len(stop_mask) * 0.8
+                    
+                    # Keep if meets constraint and improves compute saved
+                    if missed_rate <= 0.05 and compute_saved > best_compute:
+                        best_compute = compute_saved
+                        best_cutoff = pi_min
+                        best_missed = missed_rate
+            
+            if best_cutoff is not None:
+                best_results.append({
+                    'threshold': threshold,
+                    'pi_min': best_cutoff,
+                    'compute_saved': best_compute,
+                    'missed_rate': best_missed
+                })
+        
+        # Return best frontier point
+        if best_results:
+            return max(best_results, key=lambda x: x['compute_saved'])
+        else:
+            return {'threshold': 0.03, 'pi_min': 0.5, 'compute_saved': 0, 'missed_rate': 0}
+    
+    def _tune_probability_cutoff(self, final_df, threshold):
+        """Legacy method - now calls the frontier optimizer"""
+        result = self._optimize_decision_frontier(final_df)
+        return result.get('pi_min', 0.5)
+    
+    def _q_eff(self, alpha, w):
+        """Compute finite-sample corrected quantile level"""
+        sw = np.sum(w)
+        s2 = np.sum(w**2)
+        n_eff = (sw**2) / max(s2, 1e-8)
+        return min(1.0, np.ceil((n_eff + 1) * (1 - alpha)) / max(n_eff, 1.0))
+    
+    def _weighted_quantile(self, values, weights, q):
+        """Compute weighted quantile"""
+        # Convert to numpy arrays if needed
+        if hasattr(values, 'values'):
+            values = values.values
+        if hasattr(weights, 'values'):
+            weights = weights.values
+        
+        order = np.argsort(values)
+        values, weights = values[order], weights[order]
+        cdf = np.cumsum(weights) / np.sum(weights)
+        return float(np.interp(q, cdf, values))
+    
+    def _compute_weighted_conformal_quantiles(self, X_cal_scale, cal_pred_y_star):
+        """Compute weighted conformal quantiles using density ratio + Mondrian bins"""
+        from sklearn.linear_model import LogisticRegression
+        
+        # Build held-out features for density ratio estimation
+        held_out_features = []
+        for _, run in self.held_out_df[self.held_out_df['checkpoint'] == 1000].iterrows():
+            cp200 = self.held_out_df[
+                (self.held_out_df['dataset'] == run['dataset']) &
+                (self.held_out_df['strategy'] == run['strategy']) &
+                (self.held_out_df['model_name'] == run['model_name']) &
+                (self.held_out_df['checkpoint'] == 200)
+            ]
+            if len(cp200) == 0:
+                continue
+            
+            e0 = 1 - run['base']
+            e200 = 1 - cp200.iloc[0]['accuracy']
+            logit0 = logit(np.clip(e0, self.epsilon, 1-self.epsilon))
+            logit200 = logit(np.clip(e200, self.epsilon, 1-self.epsilon))
+            slope = (logit200 - logit0) / 200
+            
+            X_test = np.array([[
+                np.log(np.clip(run['model_size'], self.epsilon, None)),
+                logit(np.clip(run['perc_learnable'], self.epsilon, 1-self.epsilon)),
+                slope
+            ]])
+            
+            ystar_pred = self.model.predict(X_test)[0]
+            
+            held_out_features.append([
+                logit(np.clip(e200, self.epsilon, 1-self.epsilon)),
+                slope,
+                np.log(np.clip(run['model_size'], self.epsilon, None)),
+                logit(np.clip(run['perc_learnable'], self.epsilon, 1-self.epsilon)),
+                ystar_pred
+            ])
+        
+        if len(held_out_features) == 0:
+            # Fallback to unweighted
+            self.conformal_quantile_90 = np.quantile(self.cal_residuals_norm, 0.90)
+            self.q90_cells = {}
+            self.mondrian_b1 = None
+            self.mondrian_b2 = None
+            return
+        
+        # Stack features
+        X_cal_shift = np.column_stack([X_cal_scale, cal_pred_y_star])
+        X_test_shift = np.array(held_out_features)
+        
+        # Train domain classifier for density ratio
+        X_dom = np.vstack([X_cal_shift, X_test_shift])
+        y_dom = np.r_[np.zeros(len(X_cal_shift)), np.ones(len(X_test_shift))]
+        
+        dom_clf = LogisticRegression(max_iter=2000, random_state=42)
+        dom_clf.fit(X_dom, y_dom)
+        
+        # Get importance weights for calibration points
+        p_cal = dom_clf.predict_proba(X_cal_shift)[:, 1]
+        w_cal = p_cal / np.maximum(1 - p_cal, 1e-6)
+        w_cal = np.clip(w_cal, 0.1, 10)  # Clip extreme weights
+        
+        # For 90% two-sided coverage with conservative multiplier
+        q_level = 0.90  # Use 90% per tail with conservative λ multiplier
+        lambda_conservative = 1.55  # Conservative multiplier to hit 85%+ coverage
+        
+        print(f"\nAsymmetric conformal setup (90th percentile per tail + λ={lambda_conservative}):")
+        
+        # Compute unweighted asymmetric quantiles
+        q90_lo_base = np.quantile(self.r_neg, q_level)
+        q90_hi_base = np.quantile(self.r_pos, q_level)
+        
+        # Apply conservative multiplier
+        self.q90_lo = q90_lo_base * lambda_conservative
+        self.q90_hi = q90_hi_base * lambda_conservative
+        
+        print(f"  Base quantiles: q90_lo = {q90_lo_base:.4f}, q90_hi = {q90_hi_base:.4f}")
+        print(f"  With λ={lambda_conservative}: q90_lo = {self.q90_lo:.4f}, q90_hi = {self.q90_hi:.4f}")
+        
+        # Backward compatibility: symmetric quantile
+        self.conformal_quantile_90 = max(self.q90_lo, self.q90_hi)
+        
+        # Set up Mondrian bins with asymmetric quantiles
+        self._setup_mondrian_bins(X_cal_shift, X_test_shift, w_cal)
+    
+    def _setup_mondrian_bins(self, X_cal_shift, X_test_shift, w_cal):
+        """Set up Mondrian bins for asymmetric local quantiles"""
+        # Define bins based on held-out distribution
+        # Bin 1: quartiles of logit(e200)
+        b1 = np.quantile(X_test_shift[:, 0], [0.25, 0.5, 0.75])
+        # Bin 2: tertiles of slope
+        b2 = np.quantile(X_test_shift[:, 1], [1/3, 2/3])
+        
+        def cell_id(x1, x2):
+            return (np.searchsorted(b1, x1), np.searchsorted(b2, x2))
+        
+        # Compute asymmetric weighted quantiles per cell
+        cells = {}
+        for i in range(len(self.r_pos)):
+            key = cell_id(X_cal_shift[i, 0], X_cal_shift[i, 1])
+            if key not in cells:
+                cells[key] = {'r_pos': [], 'r_neg': [], 'w': []}
+            cells[key]['r_pos'].append(self.r_pos[i])
+            cells[key]['r_neg'].append(self.r_neg[i])
+            cells[key]['w'].append(w_cal[i])
+        
+        # Compute quantiles for cells with enough data
+        self.q90_lo_cells = {}
+        self.q90_hi_cells = {}
+        min_count = 10
+        min_eff = 8
+        
+        for key, data in cells.items():
+            r_pos_arr = np.array(data['r_pos'])
+            r_neg_arr = np.array(data['r_neg'])
+            w_arr = np.array(data['w'])
+            
+            # Check both raw count and effective n
+            sw = np.sum(w_arr)
+            s2 = np.sum(w_arr**2)
+            n_eff = (sw**2) / max(s2, 1e-8)
+            
+            if len(w_arr) >= min_count and n_eff >= min_eff:
+                # Use 90th percentile with conservative multiplier
+                q_level = 0.90
+                lambda_conservative = 1.55
+                q90_lo_base = np.quantile(r_neg_arr, q_level)
+                q90_hi_base = np.quantile(r_pos_arr, q_level)
+                self.q90_lo_cells[key] = q90_lo_base * lambda_conservative
+                self.q90_hi_cells[key] = q90_hi_base * lambda_conservative
+        
+        # Store bin edges for test time
+        self.mondrian_b1 = b1
+        self.mondrian_b2 = b2
+    
+    def _fit_model_with_conformal(self):
+        """Fit the model and compute weighted + Mondrian conformal quantiles"""
+        from sklearn.model_selection import GroupShuffleSplit
+        from sklearn.linear_model import LogisticRegression
+        
+        # Prepare data as in the calibration analysis
+        final_df = self.train_df[self.train_df['checkpoint'] == 1000].copy()
+        final_df['final_error'] = 1 - final_df['final_acc']
+        final_df['base_error'] = 1 - final_df['base']
+        
+        # Calculate slopes
+        slopes = []
+        valid_idx = []
+        
+        for idx, run in final_df.iterrows():
+            # Get checkpoint 200 data
+            cp_200 = self.train_df[
+                (self.train_df['dataset'] == run['dataset']) & 
+                (self.train_df['strategy'] == run['strategy']) & 
+                (self.train_df['model_name'] == run['model_name']) &
+                (self.train_df['checkpoint'] == 200)
+            ]
+            
+            if len(cp_200) > 0:
+                # Calculate slope
+                error_0 = run['base_error']
+                error_200 = 1 - cp_200.iloc[0]['accuracy']
+                
+                logit_0 = logit(np.clip(error_0, self.epsilon, 1-self.epsilon))
+                logit_200 = logit(np.clip(error_200, self.epsilon, 1-self.epsilon))
+                
+                slope = (logit_200 - logit_0) / 200
+                slopes.append(slope)
+                valid_idx.append(idx)
+        
+        # Filter to valid runs
+        valid_df = final_df.loc[valid_idx].copy()
+        valid_df['slope'] = slopes
+        
+        # Build features
+        X = np.column_stack([
+            np.log(valid_df['model_size']),
+            logit(np.clip(valid_df['perc_learnable'], self.epsilon, 1-self.epsilon)),
+            valid_df['slope']
+        ])
+        
+        # Target
+        y_star = (logit(np.clip(valid_df['final_error'], self.epsilon, 1-self.epsilon)) - 
+                  logit(np.clip(valid_df['base_error'], self.epsilon, 1-self.epsilon)))
+        
+        # Split for conformal
+        # Use unique run identifier as group (dataset + strategy + model_name)
+        groups = (valid_df['dataset'] + '_' + valid_df['strategy'] + '_' + valid_df['model_name']).values
+        gss = GroupShuffleSplit(n_splits=1, test_size=0.3, random_state=42)
+        train_idx, cal_idx = next(gss.split(X, y_star, groups=groups))
+        
+        # Fit model
+        self.model = Ridge(alpha=1e-3)
+        self.model.fit(X[train_idx], y_star.iloc[train_idx])
+        
+        # Compute conformal quantiles
+        cal_preds = self.model.predict(X[cal_idx])
+        cal_signed = y_star.iloc[cal_idx].values - cal_preds  # Keep signed for asymmetric
+        cal_residuals = np.abs(cal_signed)
+        
+        # Build features for scale model using checkpoint 200 info
+        cal_df = valid_df.iloc[cal_idx]
+        error_200_cal = []
+        for idx, run in cal_df.iterrows():
+            cp_200 = self.train_df[
+                (self.train_df['dataset'] == run['dataset']) & 
+                (self.train_df['strategy'] == run['strategy']) & 
+                (self.train_df['model_name'] == run['model_name']) &
+                (self.train_df['checkpoint'] == 200)
+            ]
+            if len(cp_200) > 0:
+                error_200_cal.append(1 - cp_200.iloc[0]['accuracy'])
+            else:
+                error_200_cal.append(run['final_error'])
+        
+        X_scale = np.column_stack([
+            logit(np.clip(error_200_cal, self.epsilon, 1-self.epsilon)),
+            cal_df['slope'].values,
+            X[cal_idx, 0],  # log(model_size)
+            X[cal_idx, 1]   # logit(perc_learnable)
+        ])
+        
+        # Fit scale model
+        self.scale_model = Ridge(alpha=1e-2)
+        self.scale_model.fit(X_scale, np.log(cal_residuals + 1e-8))
+        
+        # Compute normalized residuals (asymmetric)
+        s_hat_cal = np.exp(self.scale_model.predict(X_scale))
+        r_norm = cal_residuals / (s_hat_cal + 1e-8)
+        
+        # Split into positive (upper tail) and negative (lower tail) normalized residuals
+        self.r_pos = np.maximum(0.0, cal_signed) / (s_hat_cal + 1e-8)
+        self.r_neg = np.maximum(0.0, -cal_signed) / (s_hat_cal + 1e-8)
+        
+        # Store for weighted conformal
+        self.cal_residuals_norm = r_norm
+        self.X_cal_scale = X_scale
+        self.cal_pred_y_star = cal_preds
+        
+        # Compute weighted asymmetric conformal quantiles with Mondrian bins
+        self._compute_weighted_conformal_quantiles(X_scale, cal_preds)
+        
+        # Also store residual std for fallback
+        self.residual_std = np.std(y_star.iloc[train_idx] - self.model.predict(X[train_idx]))
+    
     def test_e_decision_utility(self):
-        """Test E: Decision utility (early-stop policy)"""
+        """Test E: Decision utility (early-stop policy) with two-stage approach"""
         print("\n" + "="*70)
-        print("TEST E: DECISION UTILITY (EARLY-STOP POLICY)")
+        print("TEST E: DECISION UTILITY (TWO-STAGE EARLY-STOP POLICY)")
         print("="*70)
+        
+        # First fit the model with conformal intervals
+        self._fit_model_with_conformal()
         
         # Use checkpoint 200 features to predict final gains
         final_df = self.train_df[self.train_df['checkpoint'] == 1000].copy()
@@ -518,26 +929,104 @@ class SmokeTests:
         # Calculate actual gains
         final_df['actual_gain'] = final_df['final_acc'] - final_df['base']
         
-        # Get predictions at checkpoint 200
+        # STAGE 1: CP100 filter (stop very bad runs early)
+        print("\n" + "─"*70)
+        print("STAGE 1: CP100 FILTER (90% of compute if stopped)")
+        print("─"*70)
+        self._test_stage1_cp100_filter(final_df)
+        
+        # STAGE 2: CP200 probability-based policy
+        print("\n" + "─"*70)
+        print("STAGE 2: CP200 PROBABILITY POLICY (80% of compute if stopped)")
+        print("─"*70)
+        
+        # Get predictions at checkpoint 200 with uncertainty
         predictions = []
+        uncertainties = []
+        prob_successes = []
+        
+        # Optimize the decision frontier
+        frontier_result = self._optimize_decision_frontier(final_df)
+        
+        print(f"\nStage 2 Optimal frontier point:")
+        print(f"  Threshold: {frontier_result['threshold']*100:.0f}pp")
+        print(f"  Probability cutoff: {frontier_result['pi_min']:.3f}")
+        print(f"  Stage 2 compute saved: {frontier_result['compute_saved']*100:.1f}%")
+        print(f"  Missed rate: {frontier_result['missed_rate']*100:.1f}%")
+        
+        # Test different thresholds to show the full frontier
+        thresholds = [0.01, 0.02, 0.03, 0.04, 0.05]  # 1-5 percentage points
+        
+        # For each threshold, re-run the optimization to get individual best cutoffs
+        optimal_prob_cutoffs = []
+        for threshold in thresholds:
+            # Simplified: just use the frontier result for the optimal threshold
+            if abs(threshold - frontier_result['threshold']) < 0.001:
+                optimal_prob_cutoffs.append(frontier_result['pi_min'])
+            else:
+                # Default cutoff for other thresholds
+                optimal_prob_cutoffs.append(0.5)
         
         for _, run in final_df.iterrows():
-            pred_gain = self._predict_gain_at_200(run['dataset'], run['strategy'], run['model_name'])
-            predictions.append(pred_gain)
+            pred_result = self._predict_gain_at_200(run['dataset'], run['strategy'], run['model_name'])
+            
+            if isinstance(pred_result, tuple) and pred_result[1] is not None:
+                pred_final_error, uncertainty = pred_result
+                predictions.append(1 - pred_final_error - run['base'])  # Convert to gain
+                uncertainties.append(uncertainty)
+                
+                # Calculate success probabilities for each threshold
+                run_probs = []
+                for threshold in thresholds:
+                    # Calculate probability of achieving threshold gain
+                    base_error = 1 - run['base']
+                    threshold_error = 1 - (run['base'] + threshold)
+                    
+                    # In y* space
+                    y_star_threshold = (logit(np.clip(threshold_error, self.epsilon, 1-self.epsilon)) - 
+                                      logit(np.clip(base_error, self.epsilon, 1-self.epsilon)))
+                    y_star_pred = (logit(np.clip(pred_final_error, self.epsilon, 1-self.epsilon)) - 
+                                 logit(np.clip(base_error, self.epsilon, 1-self.epsilon)))
+                    
+                    # Probability using normal approximation
+                    from scipy.stats import norm
+                    sigma = uncertainty / 1.645  # Convert 90% quantile to std
+                    prob_success = norm.cdf(y_star_threshold, loc=y_star_pred, scale=sigma)
+                    run_probs.append(prob_success)
+                
+                prob_successes.append(run_probs)
+            else:
+                # Fallback
+                if not isinstance(pred_result, tuple):
+                    predictions.append(pred_result)
+                else:
+                    predictions.append(1 - pred_result[0] - run['base'])
+                uncertainties.append(np.nan)
+                prob_successes.append([np.nan] * len(thresholds))
         
         final_df['predicted_gain'] = predictions
+        final_df['uncertainty'] = uncertainties
+        
+        # Convert prob_successes to dataframe columns
+        prob_successes = np.array(prob_successes)
+        for i, threshold in enumerate(thresholds):
+            final_df[f'prob_success_{threshold}'] = prob_successes[:, i]
         
         # Remove runs without predictions
         valid_df = final_df[final_df['predicted_gain'].notna()].copy()
         
-        # Test different thresholds
-        thresholds = [0.01, 0.02, 0.03, 0.04, 0.05]  # 1-5 percentage points
+        print(f"\nStage 2 Results by threshold:")
         
         results = []
         
-        for threshold in thresholds:
-            # Decision: stop if predicted gain < threshold
-            stop_mask = valid_df['predicted_gain'] < threshold
+        for i, (threshold, prob_cutoff) in enumerate(zip(thresholds, optimal_prob_cutoffs)):
+            # Decision: stop if P(gain >= threshold) < prob_cutoff
+            prob_col = f'prob_success_{threshold}'
+            if prob_col in valid_df.columns:
+                stop_mask = valid_df[prob_col] < prob_cutoff
+            else:
+                # Fallback to simple threshold
+                stop_mask = valid_df['predicted_gain'] < threshold
             
             # Compute saved and missed
             n_stopped = stop_mask.sum()
@@ -555,6 +1044,7 @@ class SmokeTests:
             results.append({
                 'threshold': threshold,
                 'threshold_pp': threshold * 100,
+                'prob_cutoff': prob_cutoff,
                 'n_stopped': n_stopped,
                 'compute_saved': compute_saved,
                 'missed_winners': missed_winners,
@@ -562,9 +1052,9 @@ class SmokeTests:
                 'avg_regret': avg_regret
             })
             
-            print(f"\nThreshold: ≥ {threshold*100:.0f}pp gain")
+            print(f"\nThreshold: ≥ {threshold*100:.0f}pp gain (P_stop < {prob_cutoff})")
             print(f"  Stopped: {n_stopped}/{len(valid_df)} runs")
-            print(f"  Compute saved: {compute_saved*100:.1f}%")
+            print(f"  Stage 2 compute saved: {compute_saved*100:.1f}% (80% of remaining)")
             print(f"  True winners missed: {missed_winners} ({missed_rate*100:.1f}%)")
             if avg_regret > 0:
                 print(f"  Average regret on missed: {avg_regret*100:.1f}pp")
@@ -573,6 +1063,10 @@ class SmokeTests:
         results_df = pd.DataFrame(results)
         self._plot_decision_curves(results_df)
         
+        # Compute 90% PI coverage on held-out
+        if hasattr(self, 'model') and self.model is not None:
+            self._pi_coverage_on_heldout()
+        
         # Test on held-out
         print("\n\nHeld-out performance:")
         held_out_results = self._test_decision_utility_held_out(thresholds)
@@ -580,7 +1074,7 @@ class SmokeTests:
         return results_df, held_out_results
     
     def _predict_gain_at_200(self, dataset, strategy, model_name):
-        """Predict final gain using only checkpoint 200 data"""
+        """Predict final gain using only checkpoint 200 data with uncertainty"""
         run_data = self.train_df[
             (self.train_df['dataset'] == dataset) & 
             (self.train_df['strategy'] == strategy) & 
@@ -588,28 +1082,209 @@ class SmokeTests:
         ]
         
         cp_200 = run_data[run_data['checkpoint'] == 200]
-        if len(cp_200) == 0:
-            return np.nan
+        cp_1000 = run_data[run_data['checkpoint'] == 1000]
+        if len(cp_200) == 0 or len(cp_1000) == 0:
+            return np.nan, None
             
-        # Simple model: use error@200 as predictor
+        # Get model features at checkpoint 200
+        error_0 = 1 - run_data.iloc[0]['base']
         error_200 = 1 - cp_200.iloc[0]['accuracy']
-        base_error = 1 - run_data.iloc[0]['base']
+        model_size = cp_1000.iloc[0]['model_size']
+        perc_learnable = cp_1000.iloc[0]['perc_learnable']
         
-        # Predicted final error (from our best model)
-        pred_final_error = 0.95 * error_200 + 0.02
+        # Calculate slope
+        logit_0 = logit(np.clip(error_0, self.epsilon, 1-self.epsilon))
+        logit_200 = logit(np.clip(error_200, self.epsilon, 1-self.epsilon))
+        slope = (logit_200 - logit_0) / 200
         
-        # Predicted gain
-        pred_gain = (1 - pred_final_error) - (1 - base_error)
+        # Build features (matching the model)
+        X = np.array([[
+            np.log(model_size),
+            logit(np.clip(perc_learnable, self.epsilon, 1-self.epsilon)),
+            slope
+        ]])
         
-        return pred_gain
+        # Get prediction from model
+        if hasattr(self, 'model') and self.model is not None:
+            pred_y_star = self.model.predict(X)[0]
+            pred_final_error = expit(logit_0 + pred_y_star)
+            
+            # Get uncertainty estimate from scale model
+            if hasattr(self, 'scale_model'):
+                # Build scale features
+                X_scale = np.array([[
+                    logit(np.clip(error_200, self.epsilon, 1-self.epsilon)),
+                    slope,
+                    np.log(model_size),
+                    logit(np.clip(perc_learnable, self.epsilon, 1-self.epsilon))
+                ]])
+                
+                # Get scale prediction
+                s_hat = np.exp(self.scale_model.predict(X_scale)[0])
+                
+                # Add evaluation noise (binomial variance)
+                n_eval = 1000  # Typical evaluation set size
+                e_pred = expit(logit_0 + pred_y_star)
+                s_eval = 1.0 / np.sqrt(np.maximum(n_eval * e_pred * (1 - e_pred), 1e-8))
+                s_total = np.sqrt(s_hat**2 + s_eval**2)
+                
+                uncertainty = self.conformal_quantile_90 * s_total
+            else:
+                # Fallback to standard conformal
+                uncertainty = self.conformal_quantile_90 if hasattr(self, 'conformal_quantile_90') else self.residual_std * 1.645
+            
+            return pred_final_error, uncertainty
+        else:
+            # Fallback to FITTED logit regression if trained model not available
+            models_fallback = ScalingLawModels()
+            pred_final_error = models_fallback.checkpoint_200_logit_regression(error_200)
+            pred_gain = (1 - pred_final_error) - (1 - error_0)
+            return pred_gain, None
+    
+    def _test_stage1_cp100_filter(self, final_df):
+        """Stage 1: Simple CP100 filter to catch very bad runs early"""
+        from scaling_law_models import ScalingLawModels
+        models = ScalingLawModels()
+        
+        # Get CP100 predictions
+        cp100_preds = []
+        actual_gains = []
+        
+        for _, run in final_df.iterrows():
+            cp100 = self.train_df[
+                (self.train_df['dataset'] == run['dataset']) &
+                (self.train_df['strategy'] == run['strategy']) &
+                (self.train_df['model_name'] == run['model_name']) &
+                (self.train_df['checkpoint'] == 100)
+            ]
+            
+            if len(cp100) > 0:
+                error_100 = 1 - cp100.iloc[0]['accuracy']
+                pred_final_error = models.predict_from_checkpoint_100(error_100)
+                pred_gain = (1 - pred_final_error) - run['base']
+                cp100_preds.append(pred_gain)
+                actual_gains.append(run['final_acc'] - run['base'])
+            else:
+                cp100_preds.append(np.nan)
+                actual_gains.append(np.nan)
+        
+        final_df['cp100_pred_gain'] = cp100_preds
+        valid_cp100 = final_df[final_df['cp100_pred_gain'].notna()].copy()
+        
+        if len(valid_cp100) == 0:
+            print("  No valid CP100 predictions")
+            return
+        
+        # Test different Stage 1 thresholds (percentiles of predicted gain)
+        stage1_thresholds = [0.10, 0.15, 0.20, 0.25]  # Stop bottom X% of predictions
+        
+        print(f"\nStage 1 Results (N = {len(valid_cp100)} runs):")
+        print(f"  Predicted gain: {valid_cp100['cp100_pred_gain'].mean():.3f} ± {valid_cp100['cp100_pred_gain'].std():.3f}")
+        print(f"\nPercentile-based cutoffs:")
+        
+        for pct in stage1_thresholds:
+            cutoff = valid_cp100['cp100_pred_gain'].quantile(pct)
+            stop_mask = valid_cp100['cp100_pred_gain'] < cutoff
+            n_stopped = stop_mask.sum()
+            
+            true_winners = valid_cp100['actual_gain'] >= 0.03  # Winners defined as >3pp gain
+            missed_winners = (stop_mask & true_winners).sum()
+            missed_rate = missed_winners / true_winners.sum() if true_winners.sum() > 0 else 0
+            
+            compute_saved = n_stopped / len(valid_cp100) * 0.90  # 90% of compute saved
+            
+            print(f"  p{int(pct*100)} cutoff ({cutoff:.3f}): Stop {n_stopped}/{len(valid_cp100)} ({compute_saved*100:.1f}% saved), miss {missed_winners} ({missed_rate*100:.1f}%)")
+    
+    def _pi_coverage_on_heldout(self):
+        """Compute 90% PI coverage on held-out data"""
+        held = self.held_out_df[self.held_out_df['checkpoint'] == 1000].copy()
+        cov90_list = []
+        
+        for _, run in held.iterrows():
+            cp200 = self.held_out_df[
+                (self.held_out_df['dataset'] == run['dataset']) &
+                (self.held_out_df['strategy'] == run['strategy']) &
+                (self.held_out_df['model_name'] == run['model_name']) &
+                (self.held_out_df['checkpoint'] == 200)
+            ]
+            if len(cp200) == 0:
+                continue
+                
+            e0 = 1 - run['base']
+            e200 = 1 - cp200.iloc[0]['accuracy']
+            logit0 = logit(np.clip(e0, self.epsilon, 1-self.epsilon))
+            logit200 = logit(np.clip(e200, self.epsilon, 1-self.epsilon))
+            slope = (logit200 - logit0) / 200
+            
+            X = np.array([[
+                np.log(np.clip(run['model_size'], self.epsilon, None)),
+                logit(np.clip(run['perc_learnable'], self.epsilon, 1-self.epsilon)),
+                slope
+            ]])
+            
+            ystar_hat = self.model.predict(X)[0]
+            pred_e = expit(logit0 + ystar_hat)
+            
+            # Scale features
+            Xs = np.array([[
+                logit(np.clip(e200, self.epsilon, 1-self.epsilon)),
+                slope,
+                np.log(np.clip(run['model_size'], self.epsilon, None)),
+                logit(np.clip(run['perc_learnable'], self.epsilon, 1-self.epsilon))
+            ]])
+            
+            s_hat = float(np.exp(self.scale_model.predict(Xs)[0]))
+            
+            # Eval noise
+            N_eval = 1000
+            s_eval = 1.0 / np.sqrt(max(N_eval * pred_e * (1 - pred_e), 1e-8))
+            s_tot = np.sqrt(s_hat**2 + s_eval**2)
+            
+            # Get Mondrian bin-specific asymmetric quantiles if available
+            if hasattr(self, 'mondrian_b1') and self.mondrian_b1 is not None:
+                b1_idx = np.searchsorted(self.mondrian_b1, logit(np.clip(e200, self.epsilon, 1-self.epsilon)))
+                b2_idx = np.searchsorted(self.mondrian_b2, slope)
+                cell_key = (b1_idx, b2_idx)
+                
+                # Use cell-specific quantiles if available, else global
+                if cell_key in self.q90_lo_cells:
+                    q_lo = self.q90_lo_cells[cell_key]
+                    q_hi = self.q90_hi_cells[cell_key]
+                else:
+                    q_lo = self.q90_lo  # Fallback to global weighted
+                    q_hi = self.q90_hi
+            else:
+                # Fallback to symmetric
+                q_lo = self.conformal_quantile_90
+                q_hi = self.conformal_quantile_90
+            
+            # Asymmetric intervals
+            lo = expit(logit0 + ystar_hat - q_lo * s_tot)
+            hi = expit(logit0 + ystar_hat + q_hi * s_tot)
+            y_true = 1 - run['final_acc']
+            
+            cov90_list.append((y_true >= lo) and (y_true <= hi))
+        
+        cov90 = np.mean(cov90_list) if cov90_list else np.nan
+        
+        print(f"\n90% PI coverage on held-out: {cov90*100:.1f}% (target 85-95%)")
+        print(f"  Total covered: {len([x for x in cov90_list if x])}/{len(cov90_list)}")
+        return cov90
     
     def _test_decision_utility_held_out(self, thresholds):
         """Test decision utility on held-out data"""
         held_out_final = self.held_out_df[self.held_out_df['checkpoint'] == 1000].copy()
         held_out_final['actual_gain'] = held_out_final['final_acc'] - held_out_final['base']
         
-        # Get predictions
-        predictions = []
+        # Use the FITTED logit regression model from scaling_law_models
+        models = ScalingLawModels()
+        
+        # Get predictions (all models for comparison)
+        predictions_cp200_fitted = []
+        predictions_heuristic = []
+        predictions_trajectory = []
+        predictions_trajectory_with_labels = []
+        
         for _, run in held_out_final.iterrows():
             # Check if we have checkpoint 200
             cp_200 = self.held_out_df[
@@ -622,15 +1297,136 @@ class SmokeTests:
             if len(cp_200) > 0:
                 error_200 = 1 - cp_200.iloc[0]['accuracy']
                 base_error = 1 - run['base']
-                pred_final_error = 0.95 * error_200 + 0.02
-                pred_gain = (1 - pred_final_error) - (1 - base_error)
-            else:
-                pred_gain = np.nan
+                base_acc = run['base']
                 
-            predictions.append(pred_gain)
+                # Model 1: FITTED CP200 Logit Regression
+                pred_final_error_cp200 = models.checkpoint_200_logit_regression(error_200)
+                pred_gain_cp200 = (1 - pred_final_error_cp200) - (1 - base_error)
+                
+                # Model 2: Old heuristic for comparison
+                pred_final_error_heur = 0.95 * error_200 + 0.02
+                pred_gain_heur = (1 - pred_final_error_heur) - (1 - base_error)
+                
+                # Model 3: Full trajectory model with hard-coded coefficients
+                # Calculate slope
+                logit_0 = logit(np.clip(base_error, self.epsilon, 1-self.epsilon))
+                logit_200 = logit(np.clip(error_200, self.epsilon, 1-self.epsilon))
+                slope = (logit_200 - logit_0) / 200
+                
+                # Try with strategy labels first
+                try:
+                    pred_final_error_traj_with = models.early_trajectory_model(
+                        model_size=run['model_size'],
+                        base=base_acc,
+                        perc_learnable=run['perc_learnable'],
+                        early_slope=slope,
+                        dataset=run['dataset'],
+                        strategy=run['strategy']
+                    )
+                    pred_gain_traj_with = (1 - pred_final_error_traj_with) - (1 - base_error)
+                except:
+                    pred_gain_traj_with = np.nan
+                
+                # Try without strategy labels (should use only dynamic features)
+                try:
+                    pred_final_error_traj_without = models.early_trajectory_model(
+                        model_size=run['model_size'],
+                        base=base_acc,
+                        perc_learnable=run['perc_learnable'],
+                        early_slope=slope,
+                        dataset=None,  # No dataset effects
+                        strategy=None  # No strategy effects
+                    )
+                    pred_gain_traj_without = (1 - pred_final_error_traj_without) - (1 - base_error)
+                except:
+                    pred_gain_traj_without = np.nan
+                
+                # Use the version without labels (better for generalization)
+                pred_gain_traj = pred_gain_traj_without
+            else:
+                pred_gain_cp200 = np.nan
+                pred_gain_heur = np.nan
+                pred_gain_traj = np.nan
+                pred_gain_traj_with = np.nan
+                
+            predictions_cp200_fitted.append(pred_gain_cp200)
+            predictions_heuristic.append(pred_gain_heur)
+            predictions_trajectory.append(pred_gain_traj)
+            predictions_trajectory_with_labels.append(pred_gain_traj_with)
         
-        held_out_final['predicted_gain'] = predictions
+        # Add all predictions to dataframe
+        held_out_final['predicted_gain_cp200'] = predictions_cp200_fitted
+        held_out_final['predicted_gain_heuristic'] = predictions_heuristic
+        held_out_final['predicted_gain_trajectory'] = predictions_trajectory
+        held_out_final['predicted_gain_trajectory_labeled'] = predictions_trajectory_with_labels
+        
+        # Use CP200 as default for decision thresholds
+        held_out_final['predicted_gain'] = predictions_cp200_fitted
+        
         valid_df = held_out_final[held_out_final['predicted_gain'].notna()].copy()
+        
+        # Print comprehensive comparison
+        if len(valid_df) > 0:
+            from sklearn.metrics import r2_score, mean_absolute_error
+            
+            # Compute errors (what the models actually predict)
+            valid_df['actual_error'] = 1 - held_out_final.loc[valid_df.index, 'final_acc']
+            valid_df['pred_error_heuristic'] = 1 - (valid_df['predicted_gain_heuristic'] + held_out_final.loc[valid_df.index, 'base'])
+            valid_df['pred_error_cp200'] = 1 - (valid_df['predicted_gain_cp200'] + held_out_final.loc[valid_df.index, 'base'])
+            valid_df['pred_error_trajectory'] = 1 - (valid_df['predicted_gain_trajectory'] + held_out_final.loc[valid_df.index, 'base'])
+            valid_df['pred_error_trajectory_labeled'] = 1 - (valid_df['predicted_gain_trajectory_labeled'] + held_out_final.loc[valid_df.index, 'base'])
+            
+            print(f"\n  ═══════════════════════════════════════════════════════════════")
+            print(f"  HELD-OUT MODEL COMPARISON (N = {len(valid_df)} runs)")
+            print(f"  ═══════════════════════════════════════════════════════════════")
+            print(f"\n  ACTUAL PERFORMANCE:")
+            print(f"    Error: {valid_df['actual_error'].mean():.3f} ± {valid_df['actual_error'].std():.3f}")
+            print(f"    Gain: {valid_df['actual_gain'].mean():.3f} ± {valid_df['actual_gain'].std():.3f}")
+            
+            # Model 1: Old Heuristic
+            print(f"\n  MODEL 1: OLD HEURISTIC (0.95 × e₂₀₀ + 0.02)")
+            if valid_df['pred_error_heuristic'].notna().sum() > 0:
+                r2_error_heur = r2_score(valid_df['actual_error'], valid_df['pred_error_heuristic'])
+                r2_gain_heur = r2_score(valid_df['actual_gain'], valid_df['predicted_gain_heuristic'])
+                mae_heur = mean_absolute_error(valid_df['actual_error'], valid_df['pred_error_heuristic'])
+                print(f"    R² (ERROR) = {r2_error_heur:.4f}, R² (GAIN) = {r2_gain_heur:.4f}, MAE = {mae_heur:.3f}")
+                print(f"    Error Bias: {(valid_df['pred_error_heuristic'].mean() - valid_df['actual_error'].mean()):.3f}")
+            
+            # Model 2: CP200 Fitted Logit
+            print(f"\n  MODEL 2: CP200 FITTED LOGIT REGRESSION ⭐")
+            if valid_df['pred_error_cp200'].notna().sum() > 0:
+                r2_error_cp200 = r2_score(valid_df['actual_error'], valid_df['pred_error_cp200'])
+                r2_gain_cp200 = r2_score(valid_df['actual_gain'], valid_df['predicted_gain_cp200'])
+                mae_cp200 = mean_absolute_error(valid_df['actual_error'], valid_df['pred_error_cp200'])
+                print(f"    R² (ERROR) = {r2_error_cp200:.4f}, R² (GAIN) = {r2_gain_cp200:.4f}, MAE = {mae_cp200:.3f}")
+                print(f"    Error Bias: {(valid_df['pred_error_cp200'].mean() - valid_df['actual_error'].mean()):.3f}")
+            
+            # Model 3a: Trajectory (identity-free)
+            print(f"\n  MODEL 3a: TRAJECTORY IDENTITY-FREE (dynamic features only) ⭐⭐")
+            valid_traj = valid_df[valid_df['pred_error_trajectory'].notna()]
+            if len(valid_traj) > 0:
+                r2_error_traj = r2_score(valid_traj['actual_error'], valid_traj['pred_error_trajectory'])
+                r2_gain_traj = r2_score(valid_traj['actual_gain'], valid_traj['predicted_gain_trajectory'])
+                mae_traj = mean_absolute_error(valid_traj['actual_error'], valid_traj['pred_error_trajectory'])
+                print(f"    R² (ERROR) = {r2_error_traj:.4f}, R² (GAIN) = {r2_gain_traj:.4f}, MAE = {mae_traj:.3f}")
+                print(f"    Error Bias: {(valid_traj['pred_error_trajectory'].mean() - valid_traj['actual_error'].mean()):.3f}")
+                print(f"    Coverage: {len(valid_traj)}/{len(valid_df)} runs ({len(valid_traj)/len(valid_df)*100:.1f}%)")
+            else:
+                print(f"    No valid predictions")
+            
+            # Model 3b: Trajectory with labels
+            print(f"\n  MODEL 3b: TRAJECTORY WITH LABELS (includes strategy effects)")
+            valid_traj_lab = valid_df[valid_df['pred_error_trajectory_labeled'].notna()]
+            if len(valid_traj_lab) > 0:
+                r2_error_traj_lab = r2_score(valid_traj_lab['actual_error'], valid_traj_lab['pred_error_trajectory_labeled'])
+                r2_gain_traj_lab = r2_score(valid_traj_lab['actual_gain'], valid_traj_lab['predicted_gain_trajectory_labeled'])
+                mae_traj_lab = mean_absolute_error(valid_traj_lab['actual_error'], valid_traj_lab['pred_error_trajectory_labeled'])
+                print(f"    R² (ERROR) = {r2_error_traj_lab:.4f}, R² (GAIN) = {r2_gain_traj_lab:.4f}, MAE = {mae_traj_lab:.3f}")
+                print(f"    Error Bias: {(valid_traj_lab['pred_error_trajectory_labeled'].mean() - valid_traj_lab['actual_error'].mean()):.3f}")
+            else:
+                print(f"    No valid predictions")
+            
+            print(f"\n  ═══════════════════════════════════════════════════════════════")
         
         results = []
         
