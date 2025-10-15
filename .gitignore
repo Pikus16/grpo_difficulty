@@ -14,6 +14,7 @@ added_tokens.json
 __pycache__
 wandb
 
+reasoning-gym/
 # Ignore all README.md files not at the root level
 **/README.md
 

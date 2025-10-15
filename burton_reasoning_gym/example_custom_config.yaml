@@ -1,0 +1,345 @@
+# Example custom Reasoning Gym training configuration
+# Copy this file to reasoning-gym/training/configs/ and modify as needed
+# Usage: python train_reasoning_gym.py train --config-path configs --config-name example_custom_config
+
+# Hydra configuration (do not modify)
+hydra:
+  searchpath:
+    - file://verl/verl/trainer/config
+
+defaults:
+  - ppo_trainer
+  - _self_
+
+# ============================================================================
+# REASONING GYM DATASET CONFIGURATION
+# ============================================================================
+reasoning_gym:
+  # Total size of generated dataset
+  dataset_size: 20000
+  
+  # System prompt to use (options: DeepSeekZero, Standard, etc.)
+  # See reasoning_gym.utils.SYSTEM_PROMPTS for available options
+  developer_prompt: DeepSeekZero
+  
+  # Define which Reasoning Gym tasks to include
+  # Each task can have a weight (for sampling) and optional config
+  datasets:
+    # Algorithmic tasks
+    ab:
+      weight: 1
+    
+    base_conversion:
+      weight: 1
+    
+    binary_alternation:
+      weight: 1
+      config:
+        p_solvable: 0.9  # Task-specific parameter
+    
+    caesar_cipher:
+      weight: 1
+      config:
+        max_words: 10
+    
+    # Logic tasks
+    jugs:
+      weight: 1
+      config:
+        difficulty: 6
+    
+    # Add more tasks as needed
+    # See Reasoning Gym documentation for full list
+
+# ============================================================================
+# CURRICULUM LEARNING (Optional)
+# ============================================================================
+curriculum:
+  enabled: False  # Set to True to enable automatic curriculum
+  
+  schedule:
+    automatic: True
+    update_steps: 30  # Update difficulty every N steps
+  
+  # Statistics window for curriculum decisions
+  last_k: 20
+  
+  # Thresholds for difficulty adjustment
+  success_threshold: 0.70  # Increase difficulty if success > 70%
+  failure_threshold: 0.10  # Decrease difficulty if success < 10%
+  
+  # Curriculum configuration per task
+  curricula:
+    spell_backward:
+      attribute_levels:
+        word_len: 0  # Starting difficulty level
+
+# ============================================================================
+# REWARD CONFIGURATION
+# ============================================================================
+reward:
+  # Primary reward based on correctness
+  use_accuracy: True
+  
+  # Additional reward shaping (optional)
+  secondary_rewards:
+    - name: format  # Reward proper <think></think> <answer></answer> format
+      scaling_factor: 0.2
+      kwargs:
+        preappend_thinking_token: False
+    
+    - name: length  # Reward appropriate response length
+      scaling_factor: 0.2
+
+# ============================================================================
+# DATA CONFIGURATION
+# ============================================================================
+data:
+  tokenizer: null
+  train_files: train.parquet  # Not used for Reasoning Gym
+  val_files: test.parquet      # Not used for Reasoning Gym
+  prompt_key: prompt
+  
+  # Maximum sequence lengths
+  max_prompt_length: 4096      # Adjust based on task complexity
+  max_response_length: 2048    # Adjust based on expected solution length
+  
+  # Batch sizes
+  train_batch_size: 32         # Adjust based on GPU memory
+  val_batch_size: 64
+  
+  return_raw_chat: True
+  return_raw_input_ids: True
+
+# ============================================================================
+# MODEL CONFIGURATION
+# ============================================================================
+actor_rollout_ref:
+  hybrid_engine: True
+  
+  model:
+    # Model to train (HuggingFace model ID)
+    path: Qwen/Qwen2.5-3B-Instruct  # Change to your model
+    external_lib: null
+    override_config: {}
+    enable_gradient_checkpointing: True  # Save memory
+    use_remove_padding: True
+
+  # ============================================================================
+  # ACTOR (Training) CONFIGURATION
+  # ============================================================================
+  actor:
+    strategy: fsdp  # Fully Sharded Data Parallel
+    
+    # Batch size configuration
+    ppo_mini_batch_size: 16
+    ppo_micro_batch_size: null
+    ppo_micro_batch_size_per_gpu: 8  # Adjust based on GPU memory
+    
+    # Memory management
+    use_dynamic_bsz: False
+    ppo_max_token_len_per_gpu: 49152
+    
+    # Training hyperparameters
+    grad_clip: 1.0
+    clip_ratio: 0.2
+    entropy_coeff: 0.001
+    
+    # GRPO-specific settings
+    use_kl_loss: True
+    kl_loss_coef: 0.001
+    kl_loss_type: low_var_kl
+    
+    ppo_epochs: 1
+    shuffle: False
+    
+    # Parallelism
+    ulysses_sequence_parallel_size: 1
+    
+    # Optimizer configuration
+    optim:
+      lr: 1e-6                  # Learning rate (tune this!)
+      lr_warmup_steps_ratio: 0.
+      min_lr_ratio: null
+      warmup_style: constant
+      total_training_steps: 500  # Will be set by trainer config
+    
+    # FSDP configuration
+    fsdp_config:
+      wrap_policy:
+        min_num_params: 0
+      param_offload: False
+      optimizer_offload: False
+      fsdp_size: -1
+
+  # ============================================================================
+  # REFERENCE POLICY CONFIGURATION
+  # ============================================================================
+  ref:
+    fsdp_config:
+      param_offload: True  # Offload ref model to save GPU memory
+      wrap_policy:
+        min_num_params: 0
+    
+    log_prob_micro_batch_size: null
+    log_prob_micro_batch_size_per_gpu: 160
+    log_prob_use_dynamic_bsz: ${actor_rollout_ref.actor.use_dynamic_bsz}
+    log_prob_max_token_len_per_gpu: ${actor_rollout_ref.actor.ppo_max_token_len_per_gpu}
+    ulysses_sequence_parallel_size: ${actor_rollout_ref.actor.ulysses_sequence_parallel_size}
+
+  # ============================================================================
+  # ROLLOUT (vLLM) CONFIGURATION
+  # ============================================================================
+  rollout:
+    name: vllm  # Use vLLM for fast generation
+    
+    # Sampling parameters
+    temperature: 1.0  # Sampling temperature
+    top_k: -1         # -1 for no top-k filtering
+    top_p: 1.0        # Top-p (nucleus) sampling
+    
+    prompt_length: ${data.max_prompt_length}
+    response_length: ${data.max_response_length}
+    
+    # vLLM-specific settings
+    dtype: bfloat16
+    gpu_memory_utilization: 0.7  # Adjust if OOM
+    ignore_eos: False
+    enforce_eager: True
+    free_cache_engine: True
+    load_format: dummy_dtensor
+    
+    # Parallelism for vLLM
+    tensor_model_parallel_size: 4  # GPUs for vLLM (adjust based on total GPUs)
+    
+    max_num_batched_tokens: 12288
+    max_num_seqs: 1024
+    
+    log_prob_micro_batch_size: null
+    log_prob_micro_batch_size_per_gpu: 160
+    log_prob_use_dynamic_bsz: ${actor_rollout_ref.actor.use_dynamic_bsz}
+    log_prob_max_token_len_per_gpu: ${actor_rollout_ref.actor.ppo_max_token_len_per_gpu}
+    
+    disable_log_stats: True
+    enable_chunked_prefill: True
+    
+    # For HF rollout (if not using vLLM)
+    do_sample: True
+    use_fire_sampling: False
+    max_model_len: 12288
+    
+    # Number of generations per prompt (GRPO requires > 1)
+    n: 8
+    
+    val_kwargs:
+      do_sample: True
+
+# ============================================================================
+# ALGORITHM CONFIGURATION
+# ============================================================================
+algorithm:
+  gamma: 1.0
+  lam: 1.0
+  adv_estimator: grpo  # Group Relative Policy Optimization
+  kl_penalty: kl
+  kl_ctrl:
+    type: fixed
+    kl_coef: 0.001
+
+verbose: True
+
+# ============================================================================
+# TRAINER CONFIGURATION
+# ============================================================================
+trainer:
+  balance_batch: True
+  total_epochs: 1
+  
+  # Training steps and checkpointing
+  total_training_steps: 500  # Total training steps (CHANGE THIS)
+  save_freq: 100             # Save checkpoint every N steps
+  test_freq: 100             # Evaluate every N steps
+  
+  # Logging
+  project_name: my-custom-project      # W&B project name (CHANGE THIS)
+  experiment_name: custom-experiment   # W&B run name (CHANGE THIS)
+  logger: ['console', 'wandb']
+  val_generations_to_log_to_wandb: 0
+  
+  # GPU configuration
+  nnodes: 1              # Number of nodes
+  n_gpus_per_node: 4     # GPUs per node (CHANGE THIS)
+  
+  # Checkpoint management
+  resume_mode: auto  # auto, resume_path, or False
+  resume_from_path: False
+  critic_warmup: 0
+  
+  # Storage paths
+  default_hdfs_dir: null
+  default_local_dir: checkpoints/${trainer.project_name}/${trainer.experiment_name}
+  remove_previous_ckpt_in_save: False
+  del_local_ckpt_after_load: False
+
+# ============================================================================
+# CRITIC CONFIGURATION (Not used for GRPO, but required by config)
+# ============================================================================
+critic:
+  strategy: fsdp
+  optim:
+    lr: 1e-5
+    lr_warmup_steps_ratio: 0.
+    min_lr_ratio: null
+    warmup_style: constant
+    total_training_steps: -1
+  
+  model:
+    path: ~/models/deepseek-llm-7b-chat
+    tokenizer_path: ${actor_rollout_ref.model.path}
+    override_config: {}
+    external_lib: ${actor_rollout_ref.model.external_lib}
+    enable_gradient_checkpointing: True
+    use_remove_padding: False
+    fsdp_config:
+      param_offload: False
+      optimizer_offload: False
+      wrap_policy:
+        min_num_params: 0
+      fsdp_size: -1
+  
+  ppo_mini_batch_size: ${actor_rollout_ref.actor.ppo_mini_batch_size}
+  ppo_micro_batch_size: null
+  ppo_micro_batch_size_per_gpu: null
+  forward_micro_batch_size: ${critic.ppo_micro_batch_size}
+  forward_micro_batch_size_per_gpu: ${critic.ppo_micro_batch_size_per_gpu}
+  use_dynamic_bsz: ${actor_rollout_ref.actor.use_dynamic_bsz}
+  ppo_max_token_len_per_gpu: 32768
+  forward_max_token_len_per_gpu: ${critic.ppo_max_token_len_per_gpu}
+  ulysses_sequence_parallel_size: 1
+  ppo_epochs: ${actor_rollout_ref.actor.ppo_epochs}
+  shuffle: ${actor_rollout_ref.actor.shuffle}
+  grad_clip: 1.0
+  cliprange_value: 0.5
+
+# ============================================================================
+# REWARD MODEL (Not used for GRPO)
+# ============================================================================
+reward_model:
+  enable: False  # GRPO doesn't use reward models
+  strategy: fsdp
+  model:
+    input_tokenizer: ${actor_rollout_ref.model.path}
+    path: ~/models/FsfairX-LLaMA3-RM-v0.1
+    external_lib: ${actor_rollout_ref.model.external_lib}
+    use_remove_padding: False
+    fsdp_config:
+      min_num_params: 0
+      param_offload: False
+      fsdp_size: -1
+  micro_batch_size: null
+  micro_batch_size_per_gpu: null
+  max_length: null
+  ulysses_sequence_parallel_size: 1
+  use_dynamic_bsz: ${critic.use_dynamic_bsz}
+  forward_max_token_len_per_gpu: ${critic.forward_max_token_len_per_gpu}
+
