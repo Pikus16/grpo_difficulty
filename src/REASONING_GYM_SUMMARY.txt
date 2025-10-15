@@ -1,0 +1,54 @@
+✅ CREATED: train_reasoning_gym.py - Unsloth + LoRA training with Reasoning Gym datasets
+
+📁 NEW FILES:
+  src/train_reasoning_gym.py              - Main training script
+  src/REASONING_GYM_TRAIN_README.md       - Complete usage guide
+  src/reasoning_gym_configs/algorithmic_simple.json  - Example config
+
+🎯 WHAT IT DOES:
+  - Uses your existing quantized model + LoRA infrastructure (from train.py)
+  - Generates datasets procedurally using Reasoning Gym
+  - Same GRPO algorithm and memory-efficient training
+  - No dependency on pre-made JSON datasets
+
+🚀 QUICK START:
+
+  # Test run (quick)
+  python src/train_reasoning_gym.py \
+      --dataset_config simple_algorithmic \
+      --dataset_size 5000 \
+      --max_steps 100
+
+  # Full training
+  python src/train_reasoning_gym.py \
+      --dataset_config algorithmic \
+      --dataset_size 20000 \
+      --max_steps 1000
+
+  # Custom config
+  python src/train_reasoning_gym.py \
+      --dataset_config src/reasoning_gym_configs/algorithmic_simple.json
+
+💡 KEY FEATURES:
+  ✅ Works with quantized models (4-bit)
+  ✅ LoRA for memory efficiency
+  ✅ Unlimited procedural data
+  ✅ Mix multiple task types
+  ✅ Same W&B logging
+  ✅ Compatible with your existing evaluation scripts
+
+📚 PRE-DEFINED CONFIGS:
+  - algorithmic: 10 different algorithmic reasoning tasks
+  - simple_algorithmic: 3 basic tasks for quick experiments
+
+🔧 REQUIREMENTS:
+  pip install reasoning-gym (already done if you ran setup_reasoning_gym.sh)
+
+📖 FULL DOCS:
+  See src/REASONING_GYM_TRAIN_README.md for complete documentation
+
+🎓 COMPARISON:
+  train.py                  → Fixed JSON datasets, difficulty selection
+  train_reasoning_gym.py   → Procedural Reasoning Gym datasets
+  (Both use Unsloth + LoRA + GRPO!)
+

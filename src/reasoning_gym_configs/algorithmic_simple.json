@@ -1,0 +1,21 @@
+{
+  "ab": {
+    "weight": 1
+  },
+  "caesar_cipher": {
+    "weight": 1,
+    "config": {
+      "max_words": 5
+    }
+  },
+  "base_conversion": {
+    "weight": 1
+  },
+  "jugs": {
+    "weight": 1,
+    "config": {
+      "difficulty": 4
+    }
+  }
+}
+
