@@ -228,6 +228,9 @@ def reformat_question(prompt: str, dataset_name: str):
         prompt = f"{prompt}.\n\nPut your final answer within \\boxed{{}}. Answer in 100 words or less. When checking the answer, we will directly extract your boxed answer and do a python equals comparison against the ground truth."
     elif dataset_name == 'musique':
         prompt = f"{prompt}.\n\nPut your final answer within \\boxed{{(ANSWER)}}"#. If the necessary information to answer the question is not in the context, answer with \\boxed{{CAN'T ANSWER}}."
+    elif dataset_name == 'cognition_reasoning_gym':
+        # Reasoning Gym questions already include system prompt, just add boxed instruction
+        prompt = f"{prompt}\nThink step by step and put your final answer within \\boxed{{}}."
     else:
         raise ValueError(f'Unknown dataset: {dataset_name}')
     return prompt

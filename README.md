@@ -1,6 +1,36 @@
 # GRPO Difficulty
 
-A project to analyze GRPO task difficulty and performance.
+A project to analyze GRPO task difficulty and performance with support for both fixed and procedural datasets.
+
+## 🚀 Quick Start
+
+### For Fixed Datasets (GSM8K, KEGG, etc.)
+See setup instructions below and use `src/train.py`.
+
+### For Reasoning Gym Procedural Datasets
+
+```bash
+# One-time setup
+./setup_reasoning_gym.sh
+huggingface-cli login && wandb login
+
+# Verify setup
+python train_reasoning_gym.py check
+
+# Start training (example: 2 GPUs)
+python train_reasoning_gym.py train \
+    --config-name algorithmic_qwen_3b \
+    --n-gpus 2 \
+    --tensor-parallel-size 1
+
+# Get help
+python train_reasoning_gym.py --help
+python train_reasoning_gym.py train --help
+```
+
+**Available commands**: `train`, `convert`, `evaluate`, `check`, `list-configs`, `setup`
+
+---
 
 ## Setup Instructions
 
@@ -61,3 +91,11 @@ Options:
   --just_get_order               Only save the order of train data samples
   --help                         Show this message and exit.
 ```
+
+---
+
+## Additional Resources
+
+- **`train_reasoning_gym.py`** - CLI for Reasoning Gym training (run with `--help` for details)
+- **`example_custom_config.yaml`** - Annotated config template for custom training
+- **Reasoning Gym configs** - See `reasoning-gym/training/configs/` for pre-built configs

@@ -90,6 +90,18 @@ def create_reward_func(dataset_name, regression_reward: bool = False):
             raise NotImplementedError()
         return scores.astype(int)
 
+    def reasoning_gym_reward_func(completions, answer, **kwargs):
+        """Generic reward function for Reasoning Gym tasks"""
+        predictions = np.array([extract_boxed_content(a) for a in completions])
+        # Normalize answers (lowercase, strip)
+        answer = np.array([str(a).lower().strip() for a in answer])
+        predictions = np.array([str(p).lower().strip() if p is not None else "" for p in predictions])
+        
+        scores = answer == predictions
+        if regression_reward:
+            raise NotImplementedError()
+        return scores.astype(int)
+
     if dataset_name == 'kegg':
         return kegg_reward_func
     elif dataset_name == 'gsm8k':
@@ -100,6 +112,8 @@ def create_reward_func(dataset_name, regression_reward: bool = False):
         return cruxo_reward_func
     elif dataset_name == 'musique':
         return musique_reward_func
+    elif dataset_name == 'cognition_reasoning_gym':
+        return reasoning_gym_reward_func
     else:
         raise ValueError(f'Unknown dataset name {dataset_name}')
 
