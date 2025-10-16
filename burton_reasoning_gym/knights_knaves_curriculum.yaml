@@ -2,6 +2,12 @@ reasoning_gym:
   dataset_size: 20000
   developer_prompt: DeepSeekZero
   datasets:
+    knights_knaves:
+      weight: 1
+      config:
+        n_people: 3
+        depth_constraint: 2
+        width_constraint: 2
 
 curriculum:
     enabled: True
@@ -99,7 +105,7 @@ actor_rollout_ref:
     enforce_eager: True
     free_cache_engine: True
     load_format: dummy_dtensor
-    tensor_model_parallel_size: 1
+    tensor_model_parallel_size: 4
     max_num_batched_tokens: 12288
     max_num_seqs: 1024
     log_prob_micro_batch_size: null # will be deprecated, use log_prob_micro_batch_size_per_gpu
@@ -129,14 +135,14 @@ verbose: True
 trainer:
   balance_batch: True
   total_epochs: 1
-  total_training_steps: 100
+  total_training_steps: 300
   project_name: curriculum
   experiment_name: knights_knaves_curriculum
   logger: [ 'console', 'wandb' ]
   val_generations_to_log_to_wandb: 0
   nnodes: 1
-  n_gpus_per_node: 1
-  save_freq: 50
+  n_gpus_per_node: 4
+  save_freq: 100
   # auto: find the last ckpt to resume. If can't find, start from scratch
   resume_mode: auto # or auto or resume_path if
   resume_from_path: False
