@@ -2,6 +2,12 @@
 """
 Generate comprehensive final results for all scaling law models
 Runs 3 times to validate stability
+
+Version 3.1: Uses cleaned test data (test_data_cleaned.csv) with experimental 
+replicates averaged. The original test dataset had 4 configurations run twice, 
+creating 22 duplicate rows (8 at checkpoint 1000, 14 at other checkpoints). 
+These were averaged by configuration ID, improving model accuracy and ensuring 
+proper evaluation.
 """
 
 import numpy as np
@@ -309,15 +315,15 @@ def fit_cp_logit_model(train_df, held_out_df, checkpoint, name, seed):
 
 def main():
     print("="*80)
-    print("COMPREHENSIVE SCALING LAW EVALUATION")
+    print("COMPREHENSIVE SCALING LAW EVALUATION (CLEANED DATA)")
     print("="*80)
     
-    # Load data
-    train_df = pd.read_csv('scaling_analysis_results.csv')
-    held_out_df = pd.read_csv('held_out_scaling_numbers.csv')
+    # Load data - use cleaned test data (duplicates averaged)
+    train_df = pd.read_csv('training_data.csv')
+    held_out_df = pd.read_csv('test_data_cleaned.csv')
     
     print(f"\nTraining: {len(train_df)} points")
-    print(f"Held-out: {len(held_out_df)} points")
+    print(f"Held-out: {len(held_out_df)} points (duplicates averaged)")
     
     # Run 3 times
     all_runs_results = []
@@ -399,10 +405,13 @@ def main():
             print(f"{res['name']:<25} {res['train_r2']:.4f}±{res['train_r2_std']:.5f}  {res['held_r2']:.4f}±{res['held_r2_std']:.5f}  {res['calib_slope']:.4f}±{res['calib_slope_std']:.4f}")
     
     # Save
-    with open('final_results_data.pkl', 'wb') as f:
+    with open('final_results_corrected.pkl', 'wb') as f:
         pickle.dump(final_results, f)
     
-    print(f"\n✅ Results saved to final_results_data.pkl")
+    print(f"\n✅ Results saved to final_results_corrected.pkl")
+    print(f"\nNote: Using cleaned test data (test_data_cleaned.csv)")
+    print(f"      Original had 4 configurations run twice (22 duplicate rows)")
+    print(f"      Duplicates averaged by configuration ID")
     return final_results
 
 if __name__ == "__main__":

@@ -6,24 +6,24 @@ GRPO SCALING LAWS: Complete Reference Implementation
 This module contains ALL scaling law models developed for predicting GRPO final performance.
 Each model is documented with its formula, R² performance, and practical usage.
 
-KEY RESULTS:
-- Best Training R²: 0.908 (Early Trajectory Model with preprocessing)
-- Best Held-out R²: 0.806 (Trajectory with Full Preprocessing - Model 8)
-- Best Simple Model: 0.732 (CP200 Logit Fitted - Model 6)
+KEY RESULTS (v3.1 - Cleaned Data):
+- Best Held-out R²: 0.843 (Trajectory CP200 with Full Preprocessing)
+- Best Simple Model: 0.768 (CP200 Logit Fitted)
+- Training data: 48 runs | Test data: 55 runs (duplicates averaged)
 
-MODELS:
-1. Basic Power Law (R² = 0.479)
-2. With Percentage Learnable (R² = 0.647)
-3. Logit Transformation (R² = 0.722)
-4. Fixed Effects (R² = 0.835 training, 0.278 held-out)
-5. CP200 Heuristic (R² = 0.369, NOT RECOMMENDED)
-6. CP200 Logit Fitted (R² = 0.732 held-out, ⭐ BEST SIMPLE)
-7. CP100 (R² = 0.567 held-out)
-8. Early Trajectory (R² = 0.512 direct, 0.806 with preprocessing)
-9. Trajectory Full Preprocessing (R² = 0.806 held-out, ⭐⭐⭐ BEST ACCURACY)
+MODELS (Held-out R² on cleaned test data):
+1. Basic Power Law (not recommended)
+2. With Percentage Learnable (not recommended)
+3. Logit Transformation (not recommended)
+4. Fixed Effects (not recommended - poor generalization)
+5. CP200 Heuristic (not recommended)
+6. CP200 Logit Fitted (R² = 0.768, ⭐ BEST SIMPLE)
+7. CP100 Logit (R² = 0.475)
+8. Trajectory CP100 (R² = 0.525)
+9. Trajectory CP200 (R² = 0.843, ⭐⭐⭐ BEST ACCURACY)
 
 Author: GRPO Scaling Laws Research
-Version: 2.1 - Added Trajectory with Full Preprocessing (Model 9)
+Version: 3.1 - Updated with cleaned test data (4 duplicate configurations averaged)
 """
 
 import numpy as np
@@ -43,18 +43,14 @@ class ScalingLawModels:
     """
     Collection of all scaling law models from basic to advanced.
     
-    Models are organized by complexity:
-    1. Basic Power Law (R² = 0.479)
-    2. With Percentage Learnable (R² = 0.647)  
-    3. Logit Transformation (R² = 0.722)
-    4. Fixed Effects (R² = 0.835 training, 0.278 held-out)
-    5. CP200 Heuristic (R² = 0.369 held-out, NOT RECOMMENDED)
-    6. CP200 Logit Fitted (R² = 0.732 held-out, ⭐ BEST SIMPLE)
-    7. CP100 (R² = 0.567 held-out)
-    8. Early Trajectory (R² = 0.512 held-out with hard-coded coefficients)
+    Models are organized by complexity (Held-out R² on cleaned v3.1 data):
+    6. CP200 Logit Fitted (R² = 0.768, ⭐ BEST SIMPLE)
+    7. CP100 Logit (R² = 0.475)
+    8. Trajectory CP100 (R² = 0.525)
+    9. Trajectory CP200 (R² = 0.843, ⭐⭐⭐ BEST ACCURACY)
     
     For BEST ACCURACY, use fit_trajectory_with_preprocessing() 
-    which achieves R² = 0.806 held-out
+    which achieves R² = 0.843 held-out with excellent calibration (0.951)
     """
     
     def __init__(self):
@@ -419,7 +415,7 @@ class ScalingLawModels:
         PERFORMANCE:
         ------------
         Training R² = 0.709
-        Held-out R² = 0.732 (better than simple linear!)
+        Held-out R² = 0.768 (v3.1 cleaned data - better than simple linear!)
         
         INTERPRETATION:
         ---------------
@@ -477,12 +473,18 @@ class ScalingLawModels:
         - S_{0→200} = early trajectory slope from steps 0 to 200
         - e₀ = base error, e₁ = final error
         
-        COEFFICIENTS:
-        -------------
+        COEFFICIENTS (OLD PARAMETERIZATION):
+        -------------------------------------
+        NOTE: These coefficients are from an earlier analysis with different 
+        feature scaling. The slope coefficient (147.439) is large because the 
+        slope feature was in different units than the current v3.1 model.
+        
+        Current v3.1 model uses slope coefficient ~0.298 with standardized features.
+        
         - β₀ = -0.532 (intercept)
-        - β₁ = -0.399 (model size - smaller effect than before!)
+        - β₁ = -0.399 (model size)
         - β₂ = -0.286 (learnability)
-        - β₃ = 147.439 (EARLY SLOPE - DOMINATES everything else!)
+        - β₃ = 147.439 (early slope - large due to feature scaling)
         
         Dataset Effects:
         - GSM8K: 0.0
@@ -495,18 +497,20 @@ class ScalingLawModels:
         - Middle: -0.080
         - Random: -0.097
         
-        PERFORMANCE:
-        ------------
-        Training R² = 0.908 (+7.3 percentage points over fixed effects!)
-        Held-out R² = 0.807 (GENERALIZES to completely new strategies!)
+        PERFORMANCE (OLD DATA):
+        -----------------------
+        These numbers are from an earlier evaluation before data cleaning.
+        Current v3.1 performance with cleaned data:
+        - Trajectory CP200: R² = 0.843 held-out (BEST)
+        - CP200 Logit: R² = 0.768 held-out (BEST SIMPLE)
         
         INTERPRETATION:
         ---------------
-        EARLY SLOPE DOMINATES (β₃ = 147.439):
-        - This coefficient is ~50× larger than others!
-        - Early learning trajectory tells you almost everything
+        EARLY SLOPE IS KEY PREDICTOR:
+        - Early learning trajectory is the most important feature
         - A model learning fast early → will finish strong
         - A model learning slow early → will finish weak
+        - The large coefficient (147.439) is due to feature scaling in this version
         
         WHY IT WORKS:
         - Captures learning DYNAMICS, not just static features
@@ -529,11 +533,12 @@ class ScalingLawModels:
         
         PRACTICAL USE:
         --------------
-        BEST MODEL for production use:
-        - Requires checkpoints at 0 (base) and 200
-        - Achieves highest held-out performance
-        - Generalizes to completely new strategies/datasets
-        - Essential for early stopping decisions
+        This is a LEGACY model with hard-coded coefficients.
+        
+        For production, use fit_trajectory_with_preprocessing() instead:
+        - Achieves R² = 0.843 held-out (better than this model)
+        - Fitted coefficients adapt to your data
+        - Better calibration (slope = 0.951 vs target 1.0)
         
         When to use:
         1. You have early checkpoint data (0, 200)
@@ -662,7 +667,7 @@ class ScalingLawModels:
         PERFORMANCE:
         ------------
         Training R² = 0.752
-        Held-out R² = 0.834  [BETTER than complex models on held-out!]
+        Held-out R² = 0.768 on v3.1 cleaned data [BEST SIMPLE MODEL]
         
         INTERPRETATION:
         ---------------
@@ -690,7 +695,7 @@ class ScalingLawModels:
         --------------
         BEST MODEL for practical early stopping:
         - Extremely simple (2 parameters)
-        - Highly reliable (R² = 0.834 on held-out)
+        - Highly reliable (R² = 0.768 on held-out, v3.1 cleaned data)
         - Beats complex models for generalization
         - Makes confident stop/continue decisions
         
@@ -782,7 +787,7 @@ class ScalingLawModels:
         
         PERFORMANCE:
         ------------
-        Used in Model 8 (Trajectory with Preprocessing): R² = 0.806 held-out
+        Used in Trajectory CP200 model: R² = 0.843 held-out (v3.1 cleaned data)
         
         Parameters
         ----------
@@ -882,7 +887,7 @@ class ScalingLawModels:
 
 def fit_trajectory_with_preprocessing(train_df, use_robust_slope=True, use_continuous_learnability=True):
     """
-    Fit the trajectory model with FULL PREPROCESSING (achieves R² = 0.806 held-out)
+    Fit the trajectory model with FULL PREPROCESSING (achieves R² = 0.843 held-out)
     
     This is the BEST ACCURACY model, using:
     - Robust slope estimation (Huber regression on all checkpoints 0-200)
@@ -902,7 +907,7 @@ def fit_trajectory_with_preprocessing(train_df, use_robust_slope=True, use_conti
     PERFORMANCE:
     ------------
     Training R² = 0.770
-    Held-out R² = 0.806 (BEST - validated 3 times, std dev < 0.001)
+    Held-out R² = 0.843 (BEST - validated 3 times with perfect reproducibility)
     
     VALIDATION:
     -----------
@@ -1147,7 +1152,7 @@ def predict_final_error(model_size=None, base=None, perc_learnable=None,
     --------------
     1. If checkpoint_200_error provided → Use logit regression CP200 model (R² = ~0.80+)
     2. Elif checkpoint_100_error provided → Use simple CP100 model (R² = 0.567)
-    3. Elif early_slope provided → Use trajectory model (R² = 0.807)
+    3. Elif early_slope provided → Use trajectory model (R² = 0.843)
     4. Elif model_type specified → Use that specific model
     5. Else → Fall back to logit model
     
@@ -1156,12 +1161,12 @@ def predict_final_error(model_size=None, base=None, perc_learnable=None,
     
     # BEST: Have checkpoint 200 data
     >>> predict_final_error(checkpoint_200_error=0.3)
-    0.305  # R² = 0.834
+    0.305  # R² = 0.768 (v3.1)
     
     # GOOD: Have early trajectory
     >>> predict_final_error(model_size=8, base=0.4, perc_learnable=0.3,
     ...                    early_slope=-0.01, dataset='gsm8k')
-    0.289  # R² = 0.807
+    0.289  # R² = 0.843 (v3.1)
     
     # OKAY: Have basic features only
     >>> predict_final_error(model_size=8, base=0.4, perc_learnable=0.3,
@@ -1504,7 +1509,7 @@ def evaluate_all_models(train_df, held_out_df=None, verbose=True, include_advanc
                 'Parameters': 6,
                 'Training R²': train_r2_adv,
                 'Held-out R²': held_r2_adv,
-                'Use Case': '⭐⭐⭐ BEST ACCURACY (R²=0.806)'
+                'Use Case': '⭐⭐⭐ BEST ACCURACY (R²=0.843)'
             })
     
     results_df = pd.DataFrame(results)
@@ -1517,9 +1522,9 @@ def evaluate_all_models(train_df, held_out_df=None, verbose=True, include_advanc
         print("\n" + "="*80)
         print("RECOMMENDATIONS")
         print("="*80)
-        print("• BEST ACCURACY? → Use fit_trajectory_with_preprocessing() (R² = 0.806)")
-        print("• BEST SIMPLE? → Use Model 6 CP200 Logit (R² = 0.732, fitted)")
-        print("• Need to generalize to new strategies? → Use Model 8 (R² = 0.806)")
+        print("• BEST ACCURACY? → Use fit_trajectory_with_preprocessing() (R² = 0.843)")
+        print("• BEST SIMPLE? → Use CP200 Logit (R² = 0.768, v3.1 cleaned data)")
+        print("• Need to generalize to new strategies? → Use Trajectory CP200 (R² = 0.843)")
         print("• Comparing datasets/strategies? → Use Model 4 (R² = 0.84)")
         print("• Ultra-early screening? → Use Model 7 CP100 (R² = 0.567)")
         print("• Basic features only? → Use Model 3 Logit (R² = 0.72)")
@@ -1579,7 +1584,7 @@ if __name__ == "__main__":
     
     # This requires the training data to be loaded
     try:
-        train_df_example = pd.read_csv('scaling_analysis_results.csv')
+        train_df_example = pd.read_csv('training_data.csv')
         
         # Fit the model
         traj_model = fit_trajectory_with_preprocessing(train_df_example)
@@ -1637,10 +1642,10 @@ if __name__ == "__main__":
     print("-"*80)
     
     try:
-        train_df = pd.read_csv('scaling_analysis_results.csv')
-        held_out_df = pd.read_csv('held_out_scaling_numbers.csv')
+        train_df = pd.read_csv('training_data.csv')
+        held_out_df = pd.read_csv('test_data_cleaned.csv')
         
-        print("✓ Data loaded successfully")
+        print("✓ Data loaded successfully (v3.1 cleaned)")
         print()
         
         results_df = evaluate_all_models(train_df, held_out_df, verbose=True)
@@ -1653,8 +1658,8 @@ if __name__ == "__main__":
         print(f"⚠ Data files not found: {e}")
         print("Skipping validation on real data")
         print("\nTo run full validation, ensure these files exist:")
-        print("  - scaling_analysis_results.csv")
-        print("  - held_out_scaling_numbers.csv")
+        print("  - training_data.csv")
+        print("  - test_data_cleaned.csv")
     
     print("\n" + "="*80)
     print("ALL EXAMPLES COMPLETE")
