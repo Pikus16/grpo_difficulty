@@ -2,6 +2,8 @@
 """
 Comprehensive smoke tests for the final scaling law model
 Tests for overfitting, data leakage, and selection bias
+
+Version 3.1: Uses cleaned test data (test_data_cleaned.csv)
 """
 
 import pandas as pd
@@ -1559,13 +1561,13 @@ class SmokeTests:
 
 def main():
     """Run all smoke tests"""
-    # Load data
-    train_df = pd.read_csv('../scaling_analysis_results.csv')
-    held_out_df = pd.read_csv('../held_out_scaling_numbers.csv')
+    # Load cleaned data (v3.1)
+    train_df = pd.read_csv('training_data.csv')
+    held_out_df = pd.read_csv('test_data_cleaned.csv')
     
-    print("Running comprehensive smoke tests...")
+    print("Running comprehensive smoke tests (v3.1 - cleaned data)...")
     print(f"Training data: {len(train_df)} points")
-    print(f"Held-out data: {len(held_out_df)} points")
+    print(f"Held-out data: {len(held_out_df)} points (duplicates averaged)")
     
     # Initialize tester
     tester = SmokeTests(train_df, held_out_df)
