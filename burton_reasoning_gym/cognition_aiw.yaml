@@ -1,12 +1,12 @@
 reasoning_gym:
-  dataset_size: 2000
+  dataset_size: 200
   developer_prompt: DeepSeekZero
   datasets:
     aiw:
       weight: 1
       config:
         seed: 42
-        size: 4000
+        size: 200
         max_entities: 6
 
 curriculum:
