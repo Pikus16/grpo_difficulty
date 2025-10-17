@@ -1,9 +1,22 @@
 #!/usr/bin/env python3
 """
-Generate a train.json file from a Reasoning Gym curriculum yaml config.
+Generate train.json and/or test.json datasets from a Reasoning Gym curriculum yaml config.
 
-Usage:
-    python generate_dataset_from_yaml.py knights_knaves_curriculum.yaml --output train.json --size 20000
+Usage Examples:
+    # Generate training set with size from yaml config
+    python generate_dataset_from_yaml.py cognition_aiw.yaml
+    
+    # Generate training set with custom size
+    python generate_dataset_from_yaml.py cognition_aiw.yaml --train-size 2000
+    
+    # Generate both train and test sets
+    python generate_dataset_from_yaml.py cognition_aiw.yaml --generate-both --train-size 2000 --test-size 500
+    
+    # Generate to specific directory
+    python generate_dataset_from_yaml.py cognition_aiw.yaml --output-dir ./dsets/my_dataset --generate-both
+    
+    # Custom seeds for reproducibility
+    python generate_dataset_from_yaml.py cognition_aiw.yaml --seed 123 --test-seed 456 --generate-both
 """
 
 import argparse
@@ -149,22 +162,59 @@ def save_to_json(data: list, output_path: str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate train.json from Reasoning Gym curriculum yaml"
+        description="Generate train.json and/or test.json from Reasoning Gym curriculum yaml",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Generate only training set
+  python generate_dataset_from_yaml.py cognition_aiw.yaml --train-size 2000
+
+  # Generate both train and test sets
+  python generate_dataset_from_yaml.py cognition_aiw.yaml --generate-both --train-size 2000 --test-size 500
+
+  # Generate to specific directory
+  python generate_dataset_from_yaml.py cognition_aiw.yaml --output-dir ./dsets/my_dataset --generate-both
+
+  # Use custom output filename
+  python generate_dataset_from_yaml.py cognition_aiw.yaml --output my_train.json --test-size 500
+        """
     )
     parser.add_argument(
         'yaml_config',
-        help='Path to yaml configuration file (e.g., knights_knaves_curriculum.yaml)'
+        help='Path to yaml configuration file (e.g., cognition_aiw.yaml)'
     )
     parser.add_argument(
         '--output', '-o',
-        default='train.json',
-        help='Output JSON file path (default: train.json)'
+        default=None,
+        help='Output JSON file path (default: train.json or <output-dir>/train.json)'
+    )
+    parser.add_argument(
+        '--output-dir', '-d',
+        default=None,
+        help='Output directory for train.json and test.json (creates if not exists)'
     )
     parser.add_argument(
         '--size', '-s',
         type=int,
         default=None,
-        help='Number of examples to generate (overrides yaml config)'
+        help='Number of training examples (deprecated, use --train-size)'
+    )
+    parser.add_argument(
+        '--train-size',
+        type=int,
+        default=None,
+        help='Number of training examples to generate (overrides yaml config)'
+    )
+    parser.add_argument(
+        '--test-size',
+        type=int,
+        default=None,
+        help='Number of test examples to generate'
+    )
+    parser.add_argument(
+        '--generate-both',
+        action='store_true',
+        help='Generate both train and test sets (uses dataset_size from yaml if sizes not specified)'
     )
     parser.add_argument(
         '--seed',
@@ -173,10 +223,10 @@ def main():
         help='Random seed for generation (default: 42)'
     )
     parser.add_argument(
-        '--test-size',
+        '--test-seed',
         type=int,
         default=None,
-        help='Also generate test.json with this many examples'
+        help='Random seed for test set (default: train_seed + 1)'
     )
     
     args = parser.parse_args()
@@ -191,40 +241,72 @@ def main():
     if dataset_configs is None:
         sys.exit(1)
     
-    # Use command-line size if provided, otherwise use config
-    size = args.size if args.size is not None else dataset_size
+    # Determine output paths
+    if args.output_dir:
+        output_dir = Path(args.output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        train_output = str(output_dir / 'train.json')
+        test_output = str(output_dir / 'test.json')
+    else:
+        train_output = args.output if args.output else 'train.json'
+        # Derive test output from train output
+        test_output = train_output.replace('train.json', 'test.json')
+        if test_output == train_output:
+            test_output = train_output.replace('.json', '_test.json')
+    
+    # Determine train size (priority: --train-size > --size > yaml config)
+    train_size = args.train_size or args.size or dataset_size
+    
+    # Determine test size
+    test_size = args.test_size
+    if args.generate_both and test_size is None:
+        # Default to same size as training set if --generate-both is used
+        test_size = train_size
+    
+    # Determine test seed
+    test_seed = args.test_seed if args.test_seed is not None else args.seed + 1
     
     # Generate training dataset
+    print(f"\n{'='*60}")
+    print(f"📊 TRAINING DATASET")
+    print(f"{'='*60}")
     train_data = generate_dataset(
         dataset_configs=dataset_configs,
-        size=size,
+        size=train_size,
         seed=args.seed,
         developer_prompt=developer_prompt
     )
     
     # Save training dataset
-    save_to_json(train_data, args.output)
+    save_to_json(train_data, train_output)
     
     # Generate test dataset if requested
-    if args.test_size:
-        print(f"\n🔧 Generating test dataset with {args.test_size} examples...")
+    if test_size or args.generate_both:
+        print(f"\n{'='*60}")
+        print(f"📊 TEST DATASET")
+        print(f"{'='*60}")
         test_data = generate_dataset(
             dataset_configs=dataset_configs,
-            size=args.test_size,
-            seed=args.seed + 1,  # Different seed for test set
+            size=test_size,
+            seed=test_seed,
             developer_prompt=developer_prompt
         )
         
-        test_output = args.output.replace('train.json', 'test.json')
-        if test_output == args.output:
-            test_output = args.output.replace('.json', '_test.json')
-        
         save_to_json(test_data, test_output)
     
-    print("\n✅ Dataset generation complete!")
-    print(f"\nNext steps:")
-    print(f"  1. Review the generated file: {args.output}")
+    # Final summary
+    print(f"\n{'='*60}")
+    print("✅ Dataset generation complete!")
+    print(f"{'='*60}")
+    print(f"\n📁 Generated files:")
+    print(f"  • Training: {train_output} ({train_size} examples)")
+    if test_size or args.generate_both:
+        print(f"  • Test: {test_output} ({test_size} examples)")
+    print(f"\n💡 Next steps:")
+    print(f"  1. Review the generated files")
     print(f"  2. Use with your training script")
+    if args.output_dir:
+        print(f"  3. All datasets are in: {args.output_dir}")
 
 
 if __name__ == '__main__':
