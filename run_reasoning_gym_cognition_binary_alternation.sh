@@ -1,9 +1,7 @@
 #!/bin/bash
-
+#run in qwen3-experiments
 # Configuration
-#This is in dpo-experiments
-PROJECT_DIR="/home/sa_115331388710787999833/grpo_difficulty"
-#NEED TO CHANGE PRATYUSH ITS HARDCODED
+PROJECT_DIR="/home/pratyush/grpo_difficulty"
 LOG_DIR="$PROJECT_DIR/experiment_logs"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
@@ -23,7 +21,7 @@ echo "Starting all experiments at $(date)" | tee -a "$MAIN_LOG"
 echo "Logs will be saved to: $LOG_DIR" | tee -a "$MAIN_LOG"
 
 # Define experiments
-declare -a DATASETS=("cognition_letter_jumble")
+declare -a DATASETS=("cognition_binary_alternation")
 declare -a MODELS=("unsloth/Qwen3-4B-unsloth-bnb-4bit" "unsloth/Qwen3-8B-unsloth-bnb-4bit" "unsloth/phi-4-bnb-4bit")
 
 # Training parameters
