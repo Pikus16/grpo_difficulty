@@ -2,11 +2,13 @@ reasoning_gym:
   dataset_size: 200
   developer_prompt: DeepSeekZero
   datasets:
-    color_cube_rotation:
+    leg_counting:
       weight: 1
       config:
-        min_rotations: 1
-        max_rotations: 3
+        min_animals: 3
+        max_animals: 10
+        min_instances: 1
+        max_instances: 15
         seed: 42
         size: 200
 
@@ -19,13 +21,10 @@ curriculum:
     success_threshold: 0.70
     failure_threshold: 0.30
     curricula:
-      color_cube_rotation:
+      leg_counting:
         attribute_levels:
-          min_rotations: 1
-          max_rotations: 1
-      aiw:
-        attribute_levels:
-          max_entities: 3
+          max_animals: 5
+          max_instances: 8
 
 reward:
   use_accuracy: True
@@ -140,7 +139,7 @@ trainer:
   total_epochs: 1
   total_training_steps: 300
   project_name: curriculum
-  experiment_name: cognition_curriculum
+  experiment_name: cognition_leg_counting
   logger: [ 'console', 'wandb' ]
   val_generations_to_log_to_wandb: 0
   nnodes: 1
