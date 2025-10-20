@@ -159,7 +159,7 @@ def get_random_single(whole_dataset: HFDataset, size: int, seed: int = 42):
     random.seed(seed)
     idx = random.randint(0, len(whole_dataset))
     # Select that single example
-    return subset.select([idx])
+    return whole_dataset.select([idx])
 
 
 def get_dataset_subset(whole_dataset:HFDataset, strategy: str, size: float | int) -> HFDataset:
@@ -215,6 +215,22 @@ def extract_boxed_content(text: str) -> str:
         return str(matches[-1]).strip().lower()
     except:
         return None
+
+def extract_answer_tag_content(text: str) -> str:
+    """
+    Extracts the last value found inside <answer>...</answer> tags.
+
+    Args:
+        text (str): The full text from the LLM output.
+
+    Returns:
+        str: The last answer tag value, or None if none found.
+    """
+    matches = re.findall(r'<answer>(.*?)</answer>', text, re.DOTALL)
+    try:
+        return str(matches[-1]).strip().lower()
+    except:
+        return None
     
 def reformat_question(prompt: str, dataset_name: str):
     if dataset_name == 'kegg':
@@ -228,9 +244,11 @@ def reformat_question(prompt: str, dataset_name: str):
         prompt = f"{prompt}.\n\nPut your final answer within \\boxed{{}}. Answer in 100 words or less. When checking the answer, we will directly extract your boxed answer and do a python equals comparison against the ground truth."
     elif dataset_name == 'musique':
         prompt = f"{prompt}.\n\nPut your final answer within \\boxed{{(ANSWER)}}"#. If the necessary information to answer the question is not in the context, answer with \\boxed{{CAN'T ANSWER}}."
-    elif dataset_name == 'cognition_reasoning_gym':
-        # Reasoning Gym questions already include system prompt, just add boxed instruction
-        prompt = f"{prompt}\nThink step by step and put your final answer within \\boxed{{}}."
+    elif dataset_name in ['cognition_reasoning_gym', 'cognition_aiw', 'cognition_binary_alternation', 
+                          'cognition_color_cube', 'cognition_leg_counting', 'cognition_letter_jumble']:
+        # Reasoning Gym questions already include system prompt with <answer> tag format
+        # No additional instruction needed - the system prompt already guides the format
+        pass
     else:
         raise ValueError(f'Unknown dataset: {dataset_name}')
     return prompt
@@ -328,10 +346,17 @@ def calc_accuracy(whole_dataset: HFDataset,
                 return int(x)
             except:
                 return None
+        extract_fn = extract_boxed_content
             
-    elif dataset_name in ['kegg','shuffleobj','musique', 'cognition_reasoning_gym']:
+    elif dataset_name in ['kegg','shuffleobj','musique']:
         answers = [x['answer'].lower() for x in whole_dataset]
         process_fn = lambda x: x
+        extract_fn = extract_boxed_content
+    elif dataset_name in ['cognition_reasoning_gym', 'cognition_aiw', 'cognition_binary_alternation', 
+                          'cognition_color_cube', 'cognition_leg_counting', 'cognition_letter_jumble']:
+        answers = [x['answer'].lower() for x in whole_dataset]
+        process_fn = lambda x: x
+        extract_fn = extract_answer_tag_content  # Use <answer> tags for Reasoning Gym
     elif dataset_name == 'cruxo':
         answers = [eval(x) for x in whole_dataset['answer']]
         def process_fn(x):
@@ -342,6 +367,7 @@ def calc_accuracy(whole_dataset: HFDataset,
                     return json.loads(x)
                 except:
                     return None
+        extract_fn = extract_boxed_content
     else:
         raise ValueError(f'Unknown dataset: {dataset_name}')
 
@@ -349,7 +375,7 @@ def calc_accuracy(whole_dataset: HFDataset,
     accs, pass_at_k = [], []
     for answer, responses in zip(answers, all_responses):
         preds = [
-            process_fn(extract_boxed_content(r)) for r in responses
+            process_fn(extract_fn(r)) for r in responses
         ]
         correct_ = 0
         for p in preds:

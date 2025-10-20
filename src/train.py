@@ -13,6 +13,7 @@ from src_utils import (
     get_dataset_subset,
     load_whole_dataset,
     extract_boxed_content,
+    extract_answer_tag_content,
     _get_order_file,
     _get_checkpoint_dir,
     format_dataset_
@@ -91,8 +92,8 @@ def create_reward_func(dataset_name, regression_reward: bool = False):
         return scores.astype(int)
 
     def reasoning_gym_reward_func(completions, answer, **kwargs):
-        """Generic reward function for Reasoning Gym tasks"""
-        predictions = np.array([extract_boxed_content(a) for a in completions])
+        """Generic reward function for Reasoning Gym tasks - uses <answer> tags"""
+        predictions = np.array([extract_answer_tag_content(a) for a in completions])
         # Normalize answers (lowercase, strip)
         answer = np.array([str(a).lower().strip() for a in answer])
         predictions = np.array([str(p).lower().strip() if p is not None else "" for p in predictions])
@@ -112,7 +113,8 @@ def create_reward_func(dataset_name, regression_reward: bool = False):
         return cruxo_reward_func
     elif dataset_name == 'musique':
         return musique_reward_func
-    elif dataset_name == 'cognition_reasoning_gym':
+    elif dataset_name in ['cognition_reasoning_gym', 'cognition_aiw', 'cognition_binary_alternation', 
+                          'cognition_color_cube', 'cognition_leg_counting', 'cognition_letter_jumble']:
         return reasoning_gym_reward_func
     else:
         raise ValueError(f'Unknown dataset name {dataset_name}')
