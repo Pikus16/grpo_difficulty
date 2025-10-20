@@ -1,0 +1,8 @@
+gcloud compute instances list
+gcloud compute instances start qwen3-experiments
+gcloud compute ssh qwen3-experiments
+
+tmux attach -t cognition_exp
+tmux detach
+
+exit (to exit ssh)

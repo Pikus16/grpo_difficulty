@@ -21,7 +21,7 @@ echo "Starting all experiments at $(date)" | tee -a "$MAIN_LOG"
 echo "Logs will be saved to: $LOG_DIR" | tee -a "$MAIN_LOG"
 
 # Define experiments
-declare -a DATASETS=("cognition_binary_alternation" "cognition_color_cube" "cognition_leg_counting" "cognition_letter_jumble")
+declare -a DATASETS=("cognition_letter_jumble")
 declare -a MODELS=("unsloth/phi-4-bnb-4bit" "unsloth/Qwen3-4B-unsloth-bnb-4bit" "unsloth/Qwen3-8B-unsloth-bnb-4bit")
 
 # Training parameters
@@ -30,7 +30,7 @@ NUM_GENERATIONS=8
 MAX_STEPS=1000
 SAVE_STEPS=100
 BETA=0.001
-TEST_BATCH_SIZE=16
+TEST_BATCH_SIZE=64
 TEST_NUM_REPEAT=3
 
 # Counter
