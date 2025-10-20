@@ -323,6 +323,10 @@ def log_inference_results(results_path):
               type=float,
               default=0.001,
               help='Beta Term for KL-Divergence')
+@click.option('--batch_size',
+              type=int,
+              default=4,
+              help='Training batch size')
 @click.option('--regression_reward', is_flag=True, default=False,
     help="Modify the reward to be regression rather than 0/1")
 def main(
@@ -341,6 +345,7 @@ def main(
     test_batch_size: int,
     test_num_repeat: int,
     beta: float,
+    batch_size: int,
     regression_reward: bool,
 ):
     name = f'{num_generations}gen_{max_steps}steps_{model_name}_beta{beta}'.replace('/','-')
@@ -386,6 +391,7 @@ def main(
             dataset,
             run_name=name,
             num_generations=int(num_generations),
+            batch_size=batch_size,
             max_steps=max_steps,
             save_steps=save_steps,
             checkpoint_dir=checkpoint_dir,
