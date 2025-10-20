@@ -9,7 +9,6 @@ reasoning_gym:
         max_animals: 10
         min_instances: 1
         max_instances: 15
-        seed: 42
         size: 200
 
 curriculum:

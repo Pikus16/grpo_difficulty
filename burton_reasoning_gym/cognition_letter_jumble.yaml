@@ -12,7 +12,6 @@ reasoning_gym:
         min_corruption_level: 0.1
         max_corruption_level: 0.9
         consecutive_words: True
-        seed: 42
         size: 200
 
 curriculum:

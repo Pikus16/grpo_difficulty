@@ -7,7 +7,6 @@ reasoning_gym:
       config:
         min_rotations: 1
         max_rotations: 3
-        seed: 42
         size: 200
 
 curriculum:

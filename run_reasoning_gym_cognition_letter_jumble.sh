@@ -2,6 +2,7 @@
 
 # Configuration
 PROJECT_DIR="/home/pratyush/grpo_difficulty"
+#NEED TO CHANGE PRATYUSH ITS HARDCODED
 LOG_DIR="$PROJECT_DIR/experiment_logs"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 

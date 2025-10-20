@@ -1,9 +1,5 @@
 [
   {
-    "question": "A conversation between User and Assistant. The user asks a question, and the Assistant solves it.\nThe assistant first thinks about the reasoning process in the mind and then provides the user with the answer. The reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> reasoning process here </think>\n<answer>answer here</answer>\nDo not explain your reasoning inside the answer tags, provide only the final answer. When an example is provided, you should strictly follow the format of the output/answer in that example.\n\n\nYour task is to count how many legs there are in total when given a list of animals.\n\nNow, how many legs are there in total if you have 3 sea slugs, 12 deers, 2 giraffes, 11 elephants?\n",
-    "answer": "100"
-  },
-  {
     "question": "A conversation between User and Assistant. The user asks a question, and the Assistant solves it.\nThe assistant first thinks about the reasoning process in the mind and then provides the user with the answer. The reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> reasoning process here </think>\n<answer>answer here</answer>\nDo not explain your reasoning inside the answer tags, provide only the final answer. When an example is provided, you should strictly follow the format of the output/answer in that example.\n\n\nYour task is to count how many legs there are in total when given a list of animals.\n\nNow, how many legs are there in total if you have 6 sheeps, 11 dogs, 12 praying mantiss?\n",
     "answer": "140"
   },
@@ -798,5 +794,9 @@
   {
     "question": "A conversation between User and Assistant. The user asks a question, and the Assistant solves it.\nThe assistant first thinks about the reasoning process in the mind and then provides the user with the answer. The reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> reasoning process here </think>\n<answer>answer here</answer>\nDo not explain your reasoning inside the answer tags, provide only the final answer. When an example is provided, you should strictly follow the format of the output/answer in that example.\n\n\nYour task is to count how many legs there are in total when given a list of animals.\n\nNow, how many legs are there in total if you have 14 butterflys, 3 leechs, 11 giraffes, 5 lobsters?\n",
     "answer": "178"
+  },
+  {
+    "question": "A conversation between User and Assistant. The user asks a question, and the Assistant solves it.\nThe assistant first thinks about the reasoning process in the mind and then provides the user with the answer. The reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> reasoning process here </think>\n<answer>answer here</answer>\nDo not explain your reasoning inside the answer tags, provide only the final answer. When an example is provided, you should strictly follow the format of the output/answer in that example.\n\n\nYour task is to count how many legs there are in total when given a list of animals.\n\nNow, how many legs are there in total if you have 5 sea slugs, 9 spiders, 4 crabs, 4 shrimps, 10 scorpions, 12 cats, 7 snakes, 13 birds?\n",
+    "answer": "306"
   }
 ]

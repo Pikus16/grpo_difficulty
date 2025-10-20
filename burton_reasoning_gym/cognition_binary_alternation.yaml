@@ -8,7 +8,6 @@ reasoning_gym:
         min_n: 10
         max_n: 30
         p_solvable: 0.8
-        seed: 42
         size: 200
 
 curriculum:

@@ -1,9 +1,5 @@
 [
   {
-    "question": "A conversation between User and Assistant. The user asks a question, and the Assistant solves it.\nThe assistant first thinks about the reasoning process in the mind and then provides the user with the answer. The reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> reasoning process here </think>\n<answer>answer here</answer>\nDo not explain your reasoning inside the answer tags, provide only the final answer. When an example is provided, you should strictly follow the format of the output/answer in that example.\n\n\nMary has 2 male friends and she also has 2 female friends. They all are friends with each other and have no other friends aside. How many female friends does William, a male friend of Mary, have?",
-    "answer": "3"
-  },
-  {
     "question": "A conversation between User and Assistant. The user asks a question, and the Assistant solves it.\nThe assistant first thinks about the reasoning process in the mind and then provides the user with the answer. The reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> reasoning process here </think>\n<answer>answer here</answer>\nDo not explain your reasoning inside the answer tags, provide only the final answer. When an example is provided, you should strictly follow the format of the output/answer in that example.\n\n\nJennifer has 3 brothers and she also has 6 sisters. How many sisters does Jennifer's brother have?",
     "answer": "7"
   },
@@ -798,5 +794,9 @@
   {
     "question": "A conversation between User and Assistant. The user asks a question, and the Assistant solves it.\nThe assistant first thinks about the reasoning process in the mind and then provides the user with the answer. The reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> reasoning process here </think>\n<answer>answer here</answer>\nDo not explain your reasoning inside the answer tags, provide only the final answer. When an example is provided, you should strictly follow the format of the output/answer in that example.\n\n\nPatricia has 6 male colleagues and she also has 6 female colleagues. These are all colleagues that Patricia has. All these mentioned persons around Patricia are colleagues of each other. David has 1 male colleagues and 2 female colleagues in total. All these mentioned persons around David are colleagues of each other. The people in the circle around David do not have other colleagues aside - with the only exception of Matilda. She is colleague of David and she is also colleague of Patricia, being part of Patricia's circle. How many female colleagues does Matilda have?",
     "answer": "7"
+  },
+  {
+    "question": "A conversation between User and Assistant. The user asks a question, and the Assistant solves it.\nThe assistant first thinks about the reasoning process in the mind and then provides the user with the answer. The reasoning process and answer are enclosed within <think> </think> and <answer> </answer> tags, respectively, i.e., <think> reasoning process here </think>\n<answer>answer here</answer>\nDo not explain your reasoning inside the answer tags, provide only the final answer. When an example is provided, you should strictly follow the format of the output/answer in that example.\n\n\nJessica has 5 male friends and she also has 4 female friends. They all are friends with each other and have no other friends aside. How many female friends does Thomas, a male friend of Jessica, have?",
+    "answer": "5"
   }
 ]
