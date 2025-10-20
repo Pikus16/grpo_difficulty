@@ -4,5 +4,12 @@ gcloud compute ssh qwen3-experiments
 
 tmux attach -t cognition_exp
 tmux detach
+ctrl b + d (to detach)
 
 exit (to exit ssh)
+
+
+tmux new -s cognition_exp
+
+chmod +x run_reasoning_gym_experiments.sh
+./run_reasoning_gym_experiments.sh
