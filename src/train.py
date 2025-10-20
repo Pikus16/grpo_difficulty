@@ -400,11 +400,19 @@ def main(
         torch.cuda.empty_cache()
 
     if not just_get_order:
-        # Run inference
-        cmd = f'python get_answers.py -m {model_name} --split test --dataset_name {dataset_name} -b {test_batch_size} --num_repeat {test_num_repeat} --run_name {name}'
+        # Run inference - determine correct path to get_answers.py
+        if os.path.exists('get_answers.py'):
+            get_answers_path = 'get_answers.py'
+        elif os.path.exists('src/get_answers.py'):
+            get_answers_path = 'src/get_answers.py'
+        else:
+            click.echo('Error: Cannot find get_answers.py')
+            return
+        
+        cmd = f'python {get_answers_path} -m {model_name} --split test --dataset_name {dataset_name} -b {test_batch_size} --num_repeat {test_num_repeat} --run_name {name}'
         if eval_last:
             cmd += ' --eval_last'
-        click.echo(f'Runnng command: {cmd}')
+        click.echo(f'Running command: {cmd}')
         subprocess.run(cmd, shell=True)
 
         # Log inference results to the same wandb run
