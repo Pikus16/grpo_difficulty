@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-PROJECT_DIR="/home/pratyush_eternis_ai/grpo_difficulty"
+PROJECT_DIR="/home/pratyush/grpo_difficulty"
 LOG_DIR="$PROJECT_DIR/experiment_logs"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
