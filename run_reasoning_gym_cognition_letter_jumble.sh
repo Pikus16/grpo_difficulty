@@ -22,7 +22,7 @@ echo "Starting all experiments at $(date)" | tee -a "$MAIN_LOG"
 echo "Logs will be saved to: $LOG_DIR" | tee -a "$MAIN_LOG"
 
 # Define experiments
-declare -a DATASETS=("cognition_leg_counting")
+declare -a DATASETS=("cognition_letter_jumble")
 declare -a MODELS=("unsloth/Qwen3-4B-unsloth-bnb-4bit" "unsloth/Qwen3-8B-unsloth-bnb-4bit" "unsloth/phi-4-bnb-4bit")
 
 # Training parameters

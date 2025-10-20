@@ -459,9 +459,8 @@ def format_dataset_(dataset: HFDataset, tokenizer: AutoTokenizer, dataset_name: 
             tokenizer,
             dataset_name
         )
-        return {'prompt' : new_prompt}
+        return {'prompt': new_prompt}
     dataset = dataset.map(_format_prompt)
-    # Keep both prompt and answer columns - don't remove anything except question
     dataset = dataset.remove_columns(['question'])
     return dataset
 
