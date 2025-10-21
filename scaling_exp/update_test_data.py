@@ -97,36 +97,78 @@ def find_checkpoint_dir(run, checkpoint_base_dir: str = 'checkpoints') -> Path:
     Find checkpoint directory for a W&B run
     
     Looks for patterns like:
-    - checkpoints/dataset_name/run_name/
-    - checkpoints/run_name/
+    - checkpoints/dataset_name/8gen_1000steps_model_beta0.001/
+    - checkpoints/8gen_1000steps_model_beta0.001/
+    - checkpoints/dataset_name/full_run_name/
     """
     checkpoint_base = Path(checkpoint_base_dir)
     
-    # Try to find by run name
     run_name = run.name
     dataset_name = run.config.get('dataset_name', '')
+    model_name = run.config.get('model_name', '')
+    num_gen = run.config.get('num_generations', 8)
+    max_steps = run.config.get('max_steps', 1000)
+    beta = run.config.get('beta', 0.001)
     
-    # Pattern 1: checkpoints/dataset/run_name/
+    # Extract model short name
+    model_short = model_name.split('/')[-1] if '/' in model_name else model_name
+    
+    # Build expected checkpoint dir name pattern
+    # e.g., "8gen_1000steps_unsloth-Qwen3-4B-unsloth-bnb-4bit_beta0.001"
+    checkpoint_pattern = f"{num_gen}gen_{max_steps}steps_{model_short}_beta{beta}"
+    
+    # Try multiple patterns
+    candidates = []
+    
+    # Pattern 1: checkpoint_base/checkpoint_pattern/
+    candidates.append(checkpoint_base / checkpoint_pattern)
+    
+    # Pattern 2: checkpoint_base/dataset/checkpoint_pattern/
     if dataset_name:
-        candidate = checkpoint_base / dataset_name / run_name
-        if candidate.exists():
+        candidates.append(checkpoint_base / checkpoint_pattern)
+    
+    # Pattern 3: Full run name
+    candidates.append(checkpoint_base / run_name)
+    if dataset_name:
+        candidates.append(checkpoint_base / run_name)
+    
+    # Check if any candidate exists
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_dir():
             return candidate
     
-    # Pattern 2: checkpoints/run_name/
-    candidate = checkpoint_base / run_name
-    if candidate.exists():
-        return candidate
-    
-    # Pattern 3: Search for any directory containing run_name
+    # Pattern 4: Search for directories matching the pattern
     if checkpoint_base.exists():
+        # Look for any directory containing key parts of the checkpoint pattern
+        search_patterns = [
+            f"{num_gen}gen_{max_steps}steps",
+            checkpoint_pattern,
+            model_short,
+        ]
+        
         for subdir in checkpoint_base.rglob('*'):
-            if subdir.is_dir() and run_name in str(subdir):
-                return subdir
+            if not subdir.is_dir():
+                continue
+            
+            subdir_name = subdir.name
+            # Check if directory name matches our patterns
+            if any(pattern in subdir_name for pattern in search_patterns):
+                # Additional check: make sure it has test_results.json
+                if (subdir / 'test_results.json').exists():
+                    return subdir
+    
+    # If we still haven't found it, list what's actually there
+    available_dirs = []
+    if checkpoint_base.exists():
+        available_dirs = [str(d.relative_to(checkpoint_base)) for d in checkpoint_base.rglob('*') 
+                         if d.is_dir() and (d / 'test_results.json').exists()]
     
     raise FileNotFoundError(
         f"Could not find checkpoint directory for run: {run_name}\n"
         f"Searched in: {checkpoint_base}\n"
-        f"Expected patterns: {checkpoint_base}/{dataset_name}/{run_name} or {checkpoint_base}/{run_name}"
+        f"Expected pattern: {checkpoint_pattern}\n"
+        f"Available directories with test_results.json:\n" + 
+        '\n'.join(f"  - {d}" for d in available_dirs[:10])
     )
 
 
