@@ -206,7 +206,13 @@ def combine_run_data(run_id: str, project: str, checkpoint_base_dir: str) -> pd.
     
     # 4. Extract metadata from run config
     dataset_name = run.config.get('dataset_name', 'unknown')
-    model_name = run.config.get('model_name', 'unknown')
+    model_name = run.config.get('model_name', None)
+    
+    # Fallback to run name if model_name not in config
+    if not model_name or model_name == 'unknown':
+        model_name = run.name
+        print(f"  │  ⚠️  model_name not in config, using run name: {model_name}")
+    
     strategy = run.config.get('strategy', 'unknown')
     
     # Simplify model name
