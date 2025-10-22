@@ -269,7 +269,7 @@ def build_test_model_and_tokenizer(model_name, adapter_name=None, device: str = 
         trust_remote_code=True,
         torch_dtype=torch.bfloat16,  # Use half precision=
         use_cache=True,
-        attn_implementation="flash_attention_2"
+        attn_implementation="eager"
     ).to(device)
     if adapter_name is not None:
         model.load_adapter(adapter_name)
