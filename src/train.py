@@ -114,7 +114,8 @@ def create_reward_func(dataset_name, regression_reward: bool = False):
     elif dataset_name == 'musique':
         return musique_reward_func
     elif dataset_name in ['cognition_reasoning_gym', 'cognition_aiw', 'cognition_binary_alternation', 
-                          'cognition_color_cube', 'cognition_leg_counting', 'cognition_letter_jumble']:
+                          'cognition_color_cube', 'cognition_leg_counting', 'cognition_letter_jumble',
+                          'family_relationships', 'self_reference', 'zebra_puzzles']:
         return reasoning_gym_reward_func
     else:
         raise ValueError(f'Unknown dataset name {dataset_name}')
