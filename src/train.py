@@ -421,12 +421,25 @@ def main(
         if eval_last:
             cmd += ' --eval_last'
         click.echo(f'Running command: {cmd}')
-        subprocess.run(cmd, shell=True)
+        click.echo(f'Current working directory: {os.getcwd()}')
+        click.echo(f'Checkpoint directory: {checkpoint_dir}')
+        click.echo(f'Checkpoint directory exists: {os.path.exists(checkpoint_dir)}')
+        result = subprocess.run(cmd, shell=True, cwd=os.getcwd())
+        
+        # Check if get_answers.py succeeded
+        if result.returncode != 0:
+            click.echo(f'Warning: get_answers.py failed with return code {result.returncode}')
+            click.echo('Skipping inference results logging')
+            return
 
         # Log inference results to the same wandb run
-        log_inference_results(
-            os.path.join(checkpoint_dir, 'test_results.json')
-        )
+        results_path = os.path.join(checkpoint_dir, 'test_results.json')
+        if not os.path.exists(results_path):
+            click.echo(f'Warning: {results_path} not found even though get_answers.py succeeded')
+            click.echo('Skipping inference results logging')
+            return
+        
+        log_inference_results(results_path)
 
 if __name__ == '__main__':
     main()
