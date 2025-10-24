@@ -2,6 +2,7 @@ from src_utils import run_on_all_checkpoints, _get_checkpoint_dir
 import click
 import os
 import json
+import sys
 
 @click.command()
 @click.option(
@@ -32,20 +33,37 @@ def main(
 ):
     assert split in ['train','test']
 
-    results = run_on_all_checkpoints(
-        model_name=model_name,
-        num_repeat=num_repeat,
-        batch_size=batch_size,
-        split=split,
-        dataset_name=dataset_name,
-        run_name=run_name,
-        run_only_last=eval_last
-    )
+    try:
+        results = run_on_all_checkpoints(
+            model_name=model_name,
+            num_repeat=num_repeat,
+            batch_size=batch_size,
+            split=split,
+            dataset_name=dataset_name,
+            run_name=run_name,
+            run_only_last=eval_last
+        )
+    except Exception as e:
+        click.echo(f'Error during inference: {e}', err=True)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+    
     if run_name is not None:
         # save inference info
         checkpoint_dir = _get_checkpoint_dir(dataset_name, run_name)
-        with open(os.path.join(checkpoint_dir, 'test_results.json'), 'w') as f:
-            json.dump(results, f)
+        if not os.path.exists(checkpoint_dir):
+            click.echo(f'Error: Checkpoint directory {checkpoint_dir} does not exist', err=True)
+            sys.exit(1)
+        
+        results_path = os.path.join(checkpoint_dir, 'test_results.json')
+        try:
+            with open(results_path, 'w') as f:
+                json.dump(results, f)
+            click.echo(f'Successfully saved results to {results_path}')
+        except Exception as e:
+            click.echo(f'Error saving results to {results_path}: {e}', err=True)
+            sys.exit(1)
 
 if __name__ == '__main__':
     main()
