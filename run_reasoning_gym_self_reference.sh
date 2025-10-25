@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-
+#This is in dpo-experiments
 PROJECT_DIR="/home/sa_115331388710787999833/grpo_difficulty"
 LOG_DIR="$PROJECT_DIR/experiment_logs"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
@@ -12,8 +12,6 @@ mkdir -p "$LOG_DIR"
 # Navigate to project
 cd "$PROJECT_DIR"
 
-# Activate conda
-conda activate grpo
 
 # Log file
 MAIN_LOG="$LOG_DIR/all_experiments_${TIMESTAMP}.log"
@@ -22,7 +20,7 @@ echo "Starting all experiments at $(date)" | tee -a "$MAIN_LOG"
 echo "Logs will be saved to: $LOG_DIR" | tee -a "$MAIN_LOG"
 
 # Define experiments
-declare -a DATASETS=("cognition_aiw")
+declare -a DATASETS=("self_reference")
 declare -a MODELS=("unsloth/Qwen3-4B-unsloth-bnb-4bit" "unsloth/Qwen3-8B-unsloth-bnb-4bit" "unsloth/phi-4-bnb-4bit")
 
 # Training parameters

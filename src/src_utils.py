@@ -245,7 +245,8 @@ def reformat_question(prompt: str, dataset_name: str):
     elif dataset_name == 'musique':
         prompt = f"{prompt}.\n\nPut your final answer within \\boxed{{(ANSWER)}}"#. If the necessary information to answer the question is not in the context, answer with \\boxed{{CAN'T ANSWER}}."
     elif dataset_name in ['cognition_reasoning_gym', 'cognition_aiw', 'cognition_binary_alternation', 
-                          'cognition_color_cube', 'cognition_leg_counting', 'cognition_letter_jumble']:
+                          'cognition_color_cube', 'cognition_leg_counting', 'cognition_letter_jumble',
+                          'family_relationships', 'self_reference', 'zebra_puzzles']:
         # Reasoning Gym questions already include system prompt with <answer> tag format
         # No additional instruction needed - the system prompt already guides the format
         pass
@@ -353,7 +354,8 @@ def calc_accuracy(whole_dataset: HFDataset,
         process_fn = lambda x: x
         extract_fn = extract_boxed_content
     elif dataset_name in ['cognition_reasoning_gym', 'cognition_aiw', 'cognition_binary_alternation', 
-                          'cognition_color_cube', 'cognition_leg_counting', 'cognition_letter_jumble']:
+                          'cognition_color_cube', 'cognition_leg_counting', 'cognition_letter_jumble',
+                          'family_relationships', 'self_reference', 'zebra_puzzles']:
         answers = [x['answer'].lower() for x in whole_dataset]
         process_fn = lambda x: x
         extract_fn = extract_answer_tag_content  # Use <answer> tags for Reasoning Gym
