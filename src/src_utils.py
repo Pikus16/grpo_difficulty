@@ -244,6 +244,8 @@ def reformat_question(prompt: str, dataset_name: str):
         prompt = f"{prompt}.\n\nPut your final answer within \\boxed{{}}. Answer in 100 words or less. When checking the answer, we will directly extract your boxed answer and do a python equals comparison against the ground truth."
     elif dataset_name == 'musique':
         prompt = f"{prompt}.\n\nPut your final answer within \\boxed{{(ANSWER)}}"#. If the necessary information to answer the question is not in the context, answer with \\boxed{{CAN'T ANSWER}}."
+    elif dataset_name == 'self_reference':
+        prompt = f"{prompt}. Reason and answer concisely, in 200 words or less."
     elif dataset_name in ['cognition_reasoning_gym', 'cognition_aiw', 'cognition_binary_alternation', 
                           'cognition_color_cube', 'cognition_leg_counting', 'cognition_letter_jumble',
                           'family_relationships', 'self_reference', 'zebra_puzzles']:
