@@ -92,7 +92,24 @@ def load_test_results_json(json_path: Path) -> dict:
         return json.load(f)
 
 
-def find_checkpoint_dir(run, checkpoint_base_dir: str = 'checkpoints') -> Path:
+def get_test_results_filename(train_dataset_name: str, eval_dataset_name: str = None) -> str:
+    """
+    Get the test_results filename based on whether this is cross-dataset eval
+    
+    Args:
+        train_dataset_name: Dataset used for training
+        eval_dataset_name: Dataset used for evaluation (if different)
+    
+    Returns:
+        Filename like 'test_results.json' or 'test_results_zebra_puzzles.json'
+    """
+    if eval_dataset_name and eval_dataset_name != train_dataset_name:
+        return f'test_results_{eval_dataset_name}.json'
+    return 'test_results.json'
+
+
+def find_checkpoint_dir(run, checkpoint_base_dir: str = 'checkpoints', 
+                       test_results_filename: str = 'test_results.json') -> Path:
     """
     Find checkpoint directory for a W&B run
     
@@ -100,6 +117,11 @@ def find_checkpoint_dir(run, checkpoint_base_dir: str = 'checkpoints') -> Path:
     - checkpoints/dataset_name/8gen_1000steps_model_beta0.001/
     - checkpoints/8gen_1000steps_model_beta0.001/
     - checkpoints/dataset_name/full_run_name/
+    
+    Args:
+        run: W&B run object
+        checkpoint_base_dir: Base directory for checkpoints
+        test_results_filename: Name of test results file to look for
     """
     checkpoint_base = Path(checkpoint_base_dir)
     
@@ -153,28 +175,36 @@ def find_checkpoint_dir(run, checkpoint_base_dir: str = 'checkpoints') -> Path:
             subdir_name = subdir.name
             # Check if directory name matches our patterns
             if any(pattern in subdir_name for pattern in search_patterns):
-                # Additional check: make sure it has test_results.json
-                if (subdir / 'test_results.json').exists():
+                # Additional check: make sure it has the test_results file
+                if (subdir / test_results_filename).exists():
                     return subdir
     
     # If we still haven't found it, list what's actually there
     available_dirs = []
     if checkpoint_base.exists():
         available_dirs = [str(d.relative_to(checkpoint_base)) for d in checkpoint_base.rglob('*') 
-                         if d.is_dir() and (d / 'test_results.json').exists()]
+                         if d.is_dir() and (d / test_results_filename).exists()]
     
     raise FileNotFoundError(
         f"Could not find checkpoint directory for run: {run_name}\n"
         f"Searched in: {checkpoint_base}\n"
         f"Expected pattern: {checkpoint_pattern}\n"
-        f"Available directories with test_results.json:\n" + 
+        f"Looking for: {test_results_filename}\n"
+        f"Available directories with {test_results_filename}:\n" + 
         '\n'.join(f"  - {d}" for d in available_dirs[:10])
     )
 
 
-def combine_run_data(run_id: str, project: str, checkpoint_base_dir: str) -> pd.DataFrame:
+def combine_run_data(run_id: str, project: str, checkpoint_base_dir: str, 
+                    eval_dataset_name: str = None) -> pd.DataFrame:
     """
     Combine training metrics from W&B with test evaluation results
+    
+    Args:
+        run_id: W&B run ID
+        project: W&B project name
+        checkpoint_base_dir: Base directory for checkpoints
+        eval_dataset_name: Dataset used for evaluation (if different from training dataset)
     
     Returns DataFrame matching test_data_cleaned.csv format
     """
@@ -185,10 +215,14 @@ def combine_run_data(run_id: str, project: str, checkpoint_base_dir: str) -> pd.
     training_df, run = get_training_metrics_from_wandb(run_id, project)
     print(f"  │  ✓ Got {len(training_df)} training steps")
     
-    # 2. Find checkpoint directory and test_results.json
-    print("  ├─ Looking for test_results.json...")
-    checkpoint_dir = find_checkpoint_dir(run, checkpoint_base_dir)
-    test_results_path = checkpoint_dir / 'test_results.json'
+    # 2. Determine which test results file to look for
+    train_dataset_name = run.config.get('dataset_name', 'unknown')
+    test_results_filename = get_test_results_filename(train_dataset_name, eval_dataset_name)
+    
+    # 3. Find checkpoint directory and test_results file
+    print(f"  ├─ Looking for {test_results_filename}...")
+    checkpoint_dir = find_checkpoint_dir(run, checkpoint_base_dir, test_results_filename)
+    test_results_path = checkpoint_dir / test_results_filename
     
     test_results = load_test_results_json(test_results_path)
     print(f"  │  ✓ Found: {test_results_path}")
@@ -205,7 +239,8 @@ def combine_run_data(run_id: str, project: str, checkpoint_base_dir: str) -> pd.
         raise ValueError(f"No checkpoint data in test_results.json: {test_results_path}")
     
     # 4. Extract metadata from run config
-    dataset_name = run.config.get('dataset_name', 'unknown')
+    # Use eval_dataset_name if specified (for cross-dataset eval), otherwise train dataset
+    dataset_name = eval_dataset_name if eval_dataset_name else train_dataset_name
     model_name = run.config.get('model_name', None)
     
     # Fallback to run name if model_name not in config
@@ -284,7 +319,8 @@ def combine_run_data(run_id: str, project: str, checkpoint_base_dir: str) -> pd.
 
 
 def create_combined_csv(run_ids: list, project: str, checkpoint_base_dir: str,
-                       output_path: str = None, base_csv: str = None, merge: bool = False):
+                       output_path: str = None, base_csv: str = None, merge: bool = False,
+                       eval_dataset_name: str = None):
     """
     Create CSV combining W&B training metrics with test evaluation results
     
@@ -295,6 +331,7 @@ def create_combined_csv(run_ids: list, project: str, checkpoint_base_dir: str,
         output_path: Output CSV path (auto-generated if None)
         base_csv: Path to existing CSV to merge with (optional)
         merge: If True, merge with base_csv data
+        eval_dataset_name: Dataset used for evaluation (for cross-dataset eval)
     """
     # Generate output path if not provided
     if output_path is None:
@@ -325,7 +362,7 @@ def create_combined_csv(run_ids: list, project: str, checkpoint_base_dir: str,
     for i, run_id in enumerate(run_ids, 1):
         print(f"\n[{i}/{len(run_ids)}] Run ID: {run_id}")
         try:
-            df = combine_run_data(run_id, project, checkpoint_base_dir)
+            df = combine_run_data(run_id, project, checkpoint_base_dir, eval_dataset_name)
             new_dfs.append(df)
         except Exception as e:
             print(f"  ✗ FAILED: {e}")
@@ -394,10 +431,15 @@ Examples:
   python update_test_data.py \\
       --run_ids abc123 \\
       --output my_results.csv
+  
+  # Cross-dataset evaluation
+  python update_test_data.py \\
+      --run_ids abc123 \\
+      --eval_dataset_name self_reference_hard_questions
 
 This script:
 1. Fetches training metrics (num_successes_seen, average_reward) from W&B
-2. Loads test evaluation results from checkpoint/test_results.json
+2. Loads test evaluation results from checkpoint/test_results.json (or test_results_EVAL_DATASET.json)
 3. Combines them with calculated metrics (perc_learnable, abs_improv, etc.)
 4. Outputs in the same format as test_data_cleaned.csv
         """
@@ -408,6 +450,8 @@ This script:
                         help='W&B project name (default: GRPO_DIFFICULTY)')
     parser.add_argument('--checkpoint_base_dir', default='checkpoints',
                         help='Base directory for checkpoints (default: checkpoints)')
+    parser.add_argument('--eval_dataset_name', default=None,
+                        help='Dataset used for evaluation (for cross-dataset eval). If not specified, uses training dataset.')
     parser.add_argument('--output', '-o', default=None,
                         help='Output CSV path (default: timestamped file in scaling_exp/)')
     parser.add_argument('--base', default=None,
@@ -424,6 +468,8 @@ This script:
     print(f"Format: Matches test_data_cleaned.csv")
     print(f"Project: {args.project}")
     print(f"Checkpoint dir: {args.checkpoint_base_dir}")
+    if args.eval_dataset_name:
+        print(f"Cross-dataset eval: {args.eval_dataset_name}")
     print("=" * 70)
     
     create_combined_csv(
@@ -432,5 +478,6 @@ This script:
         checkpoint_base_dir=args.checkpoint_base_dir,
         output_path=args.output,
         base_csv=args.base,
-        merge=args.merge
+        merge=args.merge,
+        eval_dataset_name=args.eval_dataset_name
     )
