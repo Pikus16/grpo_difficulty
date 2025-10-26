@@ -1,6 +1,6 @@
-# Strategy 1: Evaluation Results
+# Strategy 2: Evaluation Results
 
-**Split:** 61 train runs / 54 test runs  
+**Split:** 55 train runs / 60 test runs  
 **Date:** October 16, 2025
 
 ---
@@ -9,10 +9,10 @@
 
 ### Top Performers (Held-Out R²):
 
-1. **Trajectory CP100** - R² = 0.734 ⭐⭐⭐ BEST
-2. **CP200 Logit** - R² = 0.733 ⭐⭐ RECOMMENDED
-3. **CP100 Logit** - R² = 0.560 ⭐ EARLY
-4. **Trajectory CP200** - R² = 0.557 ⚠️
+1. **CP200 Logit** - R² = 0.739 ⭐⭐⭐ BEST
+2. **Trajectory CP100** - R² = 0.734 ⭐⭐ RECOMMENDED
+3. **Trajectory CP200** - R² = 0.687 ⭐ EARLY
+4. **CP100 Logit** - R² = 0.560 ⚠️
 
 ---
 
@@ -20,22 +20,31 @@
 
 | Model | R² Train | R² Held-Out | N Train | N Held | Calib Slope | Eligibility | Status |
 |-------|----------|-------------|---------|--------|-------------|-------------|--------|
-| CP100 Logit | 0.5959 | 0.5597 | 39 | 56 | 0.7622 ⚠️ | 56/54 (104%) | ⭐ Good |
-| CP200 Logit | 0.8184 | 0.7326 | 61 | 56 | 0.8057 ⚠️ | 56/54 (104%) | ⭐⭐ Excellent |
-| Trajectory CP100 | 0.7130 | 0.7338 | 39 | 54 | 0.9221 ✅ | 54/54 (100%) | ⭐⭐ Excellent |
-| Trajectory CP200 | 0.8487 | 0.5566 | 61 | 54 | 0.8826 ⚠️ | 54/54 (100%) | ⭐ Good |
+| CP100 Logit | 0.5959 | 0.5597 | 39 | 56 | 0.7622 ⚠️ | 56/60 (93%) | ⭐ Good |
+| CP200 Logit | 0.8087 | 0.7394 | 55 | 62 | 0.8286 ⚠️ | 62/60 (103%) | ⭐⭐ Excellent |
+| Trajectory CP100 | 0.7130 | 0.7338 | 39 | 54 | 0.9221 ✅ | 54/60 (90%) | ⭐⭐ Excellent |
+| Trajectory CP200 | 0.8582 | 0.6867 | 55 | 60 | 1.0100 ✅ | 60/60 (100%) | ⭐⭐ Excellent |
 
 **Calibration Notes:**
 - Target: 0.9-1.1 (slope=1.0 means perfectly calibrated)
+- Trajectory CP200: 1.010 ✅ Excellent
 - Trajectory CP100: 0.922 ✅ Excellent
-- Trajectory CP200: 0.883 ⚠️ Fair
-- CP200 Logit: 0.806 ⚠️ Fair
+- CP200 Logit: 0.829 ⚠️ Fair
 - CP100 Logit: 0.762 ⚠️ Fair
 
 ---
 
 ## Table 2: Policy Savings - Top 2 Models
 
+
+### CP200 Logit
+
+| Threshold | Compute Saved | Winners Missed |
+|-----------|---------------|----------------|
+| 5pp | 34.8% | 0.0% |
+| 10pp | 34.8% | 0.0% |
+| 15pp | 36.1% | 3.0% |
+| 20pp | 38.7% | 3.6% |
 
 ### Trajectory CP100
 
@@ -45,15 +54,6 @@
 | 10pp | 36.7% | 3.0% |
 | 15pp | 36.7% | 3.1% |
 | 20pp | 43.3% | 3.6% |
-
-### CP200 Logit
-
-| Threshold | Compute Saved | Winners Missed |
-|-----------|---------------|----------------|
-| 5pp | 30.0% | 0.0% |
-| 10pp | 31.4% | 2.9% |
-| 15pp | 30.0% | 0.0% |
-| 20pp | 34.3% | 3.6% |
 
 ---
 
@@ -70,12 +70,12 @@ Cross-validation splits the training data into 5 folds, trains on 4 folds and va
 | Model | CV R² (5-fold) | Held-Out R² | Difference | Assessment |
 |-------|----------------|-------------|------------|------------|
 | CP100 Logit | 0.5065±0.155 | 0.5597 | -0.0531 | ✓ Acceptable |
-| CP200 Logit | 0.7945±0.045 | 0.7326 | +0.0619 | ✓ Acceptable |
+| CP200 Logit | 0.7813±0.090 | 0.7394 | +0.0419 | ✅ Good match |
 | Trajectory CP100 | 0.6003±0.065 | 0.7338 | -0.1336 | ⚠️ Test easier |
-| Trajectory CP200 | 0.8170±0.079 | 0.5566 | +0.2604 | ⚠️ May overfit |
+| Trajectory CP200 | 0.8288±0.032 | 0.6867 | +0.1421 | ⚠️ May overfit |
 
 **Validation Notes:**
-- **Trajectory CP200:** CV >> Held-out (+0.260) suggests model overfits to training distribution. Results may be optimistic.
+- **CP200 Logit:** Excellent match (Δ=+0.042), results are reliable.
 
 ---
 

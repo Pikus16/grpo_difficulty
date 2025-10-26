@@ -57,6 +57,29 @@
 
 ---
 
+## Table 3: Cross-Validation Results
+
+**What is Cross-Validation?**
+Cross-validation splits the training data into 5 folds, trains on 4 folds and validates on the remaining fold, repeating for all folds. This tests if the model generalizes well even within the training set and helps detect overfitting.
+
+**Interpreting CV vs Held-Out:**
+- **CV ≈ Held-Out:** Model generalizes well ✅
+- **CV >> Held-Out:** Model may overfit to training distribution ⚠️
+- **CV << Held-Out:** Test set is easier than expected ⚠️
+
+| Model | CV R² (5-fold) | Held-Out R² | Difference | Assessment |
+|-------|----------------|-------------|------------|------------|
+| CP100 Logit | 0.2201±0.926 | 0.6022 | -0.3821 | ⚠️ Test easier |
+| CP200 Logit | 0.6998±0.264 | 0.8029 | -0.1031 | ⚠️ Test easier |
+| Trajectory CP100 | 0.6215±0.272 | 0.5465 | +0.0750 | ✓ Acceptable |
+| Trajectory CP200 | 0.7813±0.174 | 0.8020 | -0.0207 | ✅ Good match |
+
+**Validation Notes:**
+- **CP100 Logit:** Held-out >> CV (-0.382) suggests test set is easier or different distribution than training.
+- **Trajectory CP200:** Excellent match (Δ=-0.021), results are reliable.
+
+---
+
 ## Status
 
 ✅ **EVALUATION COMPLETE**
