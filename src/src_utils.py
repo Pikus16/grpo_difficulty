@@ -250,6 +250,10 @@ def reformat_question(prompt: str, dataset_name: str):
         # Reasoning Gym questions already include system prompt with <answer> tag format
         # No additional instruction needed - the system prompt already guides the format
         pass
+    elif any(dataset_name.startswith(base) for base in ['family_relationships', 'self_reference', 'zebra_puzzles', 'cognition_']):
+        # Handle dataset variants (e.g., family_relationships_hard, self_reference_v2, etc.)
+        # These also use reasoning gym format with <answer> tags
+        pass
     else:
         raise ValueError(f'Unknown dataset: {dataset_name}')
     return prompt
@@ -353,9 +357,10 @@ def calc_accuracy(whole_dataset: HFDataset,
         answers = [x['answer'].lower() for x in whole_dataset]
         process_fn = lambda x: x
         extract_fn = extract_boxed_content
-    elif dataset_name in ['cognition_reasoning_gym', 'cognition_aiw', 'cognition_binary_alternation', 
-                          'cognition_color_cube', 'cognition_leg_counting', 'cognition_letter_jumble',
-                          'family_relationships', 'self_reference', 'zebra_puzzles']:
+    elif (dataset_name in ['cognition_reasoning_gym', 'cognition_aiw', 'cognition_binary_alternation', 
+                           'cognition_color_cube', 'cognition_leg_counting', 'cognition_letter_jumble',
+                           'family_relationships', 'self_reference', 'zebra_puzzles'] or
+          any(dataset_name.startswith(base) for base in ['family_relationships', 'self_reference', 'zebra_puzzles', 'cognition_'])):
         answers = [x['answer'].lower() for x in whole_dataset]
         process_fn = lambda x: x
         extract_fn = extract_answer_tag_content  # Use <answer> tags for Reasoning Gym
@@ -471,19 +476,27 @@ def run_on_all_checkpoints(
     num_repeat: int,
     batch_size: int,
     split: str,
-    dataset_name: str,
-    run_name: str,
+    train_dataset_name: str = None,
+    eval_dataset_name: str = None,
+    dataset_name: str = None,  # For backward compatibility
+    run_name: str = None,
     run_only_last: bool = False
 ):
+    # Handle backward compatibility
+    if train_dataset_name is None and eval_dataset_name is None:
+        train_dataset_name = dataset_name
+        eval_dataset_name = dataset_name
+    
     results = {}
-    if dataset_name is not None and run_name is not None:
-        adapter_folder = _get_checkpoint_dir(dataset_name, run_name)
-        assert os.path.exists(adapter_folder)
+    if train_dataset_name is not None and run_name is not None:
+        adapter_folder = _get_checkpoint_dir(train_dataset_name, run_name)
+        assert os.path.exists(adapter_folder), f"Checkpoint folder not found: {adapter_folder}"
         all_adapters = glob(f'{adapter_folder}/checkpoint-*')
         checkpoint_numbers = sorted([int(os.path.basename(path).split('-')[1]) for path in all_adapters])
         if run_only_last:
             checkpoint_numbers = [checkpoint_numbers[-1]]
         print(f'Running on checkpoints: {checkpoint_numbers}')
+        print(f'Evaluating on dataset: {eval_dataset_name}')
 
         accuracies, passes = [], []
         for ckpt_num in checkpoint_numbers:
@@ -493,7 +506,7 @@ def run_on_all_checkpoints(
                 model_name=model_name,
                 adapter_name=adapter_name,
                 split=split,
-                dataset_name=dataset_name,
+                dataset_name=eval_dataset_name,
                 batch_size=batch_size,
                 num_repeat=num_repeat
             )
@@ -507,19 +520,19 @@ def run_on_all_checkpoints(
         results['accuracy'] = accuracies
         results[f'pass@{num_repeat}'] = passes
 
-    print(f'Running pretrained')
+    print(f'Running pretrained on {eval_dataset_name}')
     pretrained_accuracy, pretrained_passes = do_single_run(
         model_name=model_name,
         adapter_name=None,
         split=split,
-        dataset_name=dataset_name,
+        dataset_name=eval_dataset_name,
         batch_size=batch_size,
         num_repeat=num_repeat
     )
     print(f"Base: Accuracy: {pretrained_accuracy:0.3f}, Pass@{num_repeat}: {pretrained_passes:0.3f}")
 
-    results[ 'base accuracy'] = pretrained_accuracy
-    results[f'base pass@{num_repeat}'] =  pretrained_passes
+    results['base accuracy'] = pretrained_accuracy
+    results[f'base pass@{num_repeat}'] = pretrained_passes
     return results
     
 class CumulativeSuccessCallback(TrainerCallback):
