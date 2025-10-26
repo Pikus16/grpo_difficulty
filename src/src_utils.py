@@ -250,6 +250,10 @@ def reformat_question(prompt: str, dataset_name: str):
         # Reasoning Gym questions already include system prompt with <answer> tag format
         # No additional instruction needed - the system prompt already guides the format
         pass
+    elif any(dataset_name.startswith(base) for base in ['family_relationships', 'self_reference', 'zebra_puzzles', 'cognition_']):
+        # Handle dataset variants (e.g., family_relationships_hard, self_reference_v2, etc.)
+        # These also use reasoning gym format with <answer> tags
+        pass
     else:
         raise ValueError(f'Unknown dataset: {dataset_name}')
     return prompt
@@ -353,9 +357,10 @@ def calc_accuracy(whole_dataset: HFDataset,
         answers = [x['answer'].lower() for x in whole_dataset]
         process_fn = lambda x: x
         extract_fn = extract_boxed_content
-    elif dataset_name in ['cognition_reasoning_gym', 'cognition_aiw', 'cognition_binary_alternation', 
-                          'cognition_color_cube', 'cognition_leg_counting', 'cognition_letter_jumble',
-                          'family_relationships', 'self_reference', 'zebra_puzzles']:
+    elif (dataset_name in ['cognition_reasoning_gym', 'cognition_aiw', 'cognition_binary_alternation', 
+                           'cognition_color_cube', 'cognition_leg_counting', 'cognition_letter_jumble',
+                           'family_relationships', 'self_reference', 'zebra_puzzles'] or
+          any(dataset_name.startswith(base) for base in ['family_relationships', 'self_reference', 'zebra_puzzles', 'cognition_'])):
         answers = [x['answer'].lower() for x in whole_dataset]
         process_fn = lambda x: x
         extract_fn = extract_answer_tag_content  # Use <answer> tags for Reasoning Gym
